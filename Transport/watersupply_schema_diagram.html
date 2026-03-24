@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Water Supply Data Schema — Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --bg:#04080f;--surface:#0a1220;--surface2:#0e1a2e;--border:#162338;
+    --a1:#38bdf8;--a2:#34d399;--a3:#fb923c;--a4:#a78bfa;--a5:#f472b6;--a6:#facc15;--a7:#60a5fa;
+    --warn:#f87171;--text:#cbd5e1;--muted:#475569;
+    --tag-bg:rgba(56,189,248,0.07);--tag-border:rgba(56,189,248,0.2);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 15% 85%,rgba(56,189,248,0.06) 0%,transparent 55%),radial-gradient(ellipse at 85% 15%,rgba(52,211,153,0.05) 0%,transparent 50%),linear-gradient(rgba(56,189,248,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.02) 1px,transparent 1px);background-size:100% 100%,100% 100%,44px 44px,44px 44px;pointer-events:none;z-index:0}
+  .wrapper{position:relative;z-index:1;max-width:1700px;margin:0 auto;padding:30px 20px 80px}
+  header{text-align:center;margin-bottom:36px}
+  .hbadge{display:inline-flex;align-items:center;gap:7px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);border-radius:20px;padding:4px 14px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--a1);margin-bottom:12px}
+  header h1{font-size:clamp(22px,4vw,46px);font-weight:300;color:#fff;letter-spacing:-1px;line-height:1.1}
+  header h1 span{color:var(--a1);font-weight:600}
+  header p{margin-top:9px;color:var(--muted);font-size:13px;max-width:640px;margin-inline:auto;line-height:1.6}
+  .stats-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;justify-content:center}
+  .stat-pill{background:var(--surface);border:1px solid var(--border);border-radius:40px;padding:5px 13px;display:flex;align-items:center;gap:7px}
+  .stat-num{font-family:'Space Mono',monospace;font-size:16px;font-weight:700;color:var(--a1);line-height:1}
+  .stat-label{font-size:10px;color:var(--muted)}
+  .arch-overview{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:22px}
+  .arch-title{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+  .arch-flow{display:flex;align-items:stretch;flex-wrap:wrap;justify-content:center}
+  .arch-tier{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:105px}
+  .arch-tier-label{font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
+  .arch-tier-box{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;text-align:center;font-size:10px;font-weight:500;color:var(--text);width:100%}
+  .arch-root{border-color:var(--a1);color:var(--a1);font-weight:700;font-size:13px;box-shadow:0 0 16px rgba(56,189,248,0.1)}
+  .arch-arrow{display:flex;align-items:center;color:var(--muted);font-size:13px;padding:0 5px;padding-top:19px}
+  .wq-bar{background:rgba(52,211,153,0.07);border:1px solid rgba(52,211,153,0.2);border-radius:8px;padding:8px 12px;margin-bottom:20px;font-size:10px;color:var(--a2);font-family:'Space Mono',monospace}
+  .wq-bar-label{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .section-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+  .section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+  .section-label span{color:var(--a1)}
+  .schema-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:11px}
+  .span2{grid-column:span 2}
+  @media(max-width:680px){.span2{grid-column:span 1}}
+  .fc-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:transform .2s,box-shadow .2s,border-color .2s}
+  .fc-card:hover{transform:translateY(-2px);box-shadow:0 8px 26px rgba(0,0,0,.5);border-color:var(--cls-color,var(--a1))}
+  .fc-header{padding:10px 13px 9px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+  .fc-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;background:color-mix(in srgb,var(--cls-color,#38bdf8) 15%,transparent)}
+  .fc-title-group{flex:1;min-width:0}
+  .fc-class-name{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:2px;text-transform:uppercase;margin-bottom:1px;color:var(--cls-color,var(--a1))}
+  .fc-title{font-size:12px;font-weight:600;color:#fff}
+  .fc-badge{font-size:9px;font-family:'Space Mono',monospace;padding:2px 6px;border-radius:8px;white-space:nowrap;flex-shrink:0;background:color-mix(in srgb,var(--cls-color,#38bdf8) 12%,transparent);border:1px solid color-mix(in srgb,var(--cls-color,#38bdf8) 28%,transparent);color:var(--cls-color,var(--a1))}
+  .fc-body{padding:10px 13px}
+  .fc-desc{font-size:11px;color:var(--muted);margin-bottom:9px;line-height:1.5}
+  .fg{margin-bottom:9px}.fg:last-child{margin-bottom:0}
+  .fgl{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--border)}
+  .fr{display:flex;align-items:flex-start;gap:4px;margin-bottom:2px;font-size:11px}
+  .fn{color:var(--text);font-weight:500;flex-shrink:0;min-width:105px}
+  .ft{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);flex-shrink:0}
+  .fm{font-size:9px;color:var(--warn);margin-left:auto;font-weight:700;flex-shrink:0}
+  .fm.o{color:var(--muted);font-weight:400}
+  .ew{display:flex;flex-wrap:wrap;gap:3px;margin-top:2px;margin-bottom:3px}
+  .et{font-size:9px;font-family:'Space Mono',monospace;padding:1px 5px;border-radius:3px;background:var(--tag-bg);border:1px solid var(--tag-border);color:var(--a1)}
+  .em{font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;padding:1px 3px}
+  .sf{margin-left:9px;padding-left:8px;border-left:2px solid var(--border);margin-top:3px}
+  .sf .fr{font-size:10px}.sf .fn{min-width:88px;color:var(--muted)}
+  .gc{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-family:'Space Mono',monospace;padding:2px 7px;background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.15);border-radius:5px;color:var(--a7);margin-top:5px}
+  .ftog{display:flex;align-items:center;justify-content:center;gap:5px;padding:5px;background:var(--surface2);font-size:9px;color:var(--muted);cursor:pointer;transition:color .2s;font-family:'Space Mono',monospace;letter-spacing:1px;border-top:1px solid var(--border)}
+  .ftog:hover{color:var(--a1);background:rgba(56,189,248,0.05)}
+  .fdet{display:none;padding:9px 13px;border-top:1px solid var(--border)}
+  .fdet.open{display:block}
+  .scr{max-height:280px;overflow-y:auto;padding-right:3px}
+  .scr::-webkit-scrollbar{width:3px}.scr::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+  .sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:7px;margin-top:7px}
+  .sp{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px}
+  .sl{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--a1);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+  .legend{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:26px}
+  .li{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:3px 8px;border-radius:16px}
+  .ld{width:6px;height:6px;border-radius:50%}
+  footer{text-align:center;margin-top:42px;font-size:10px;color:var(--muted);font-family:'Space Mono',monospace}
+  footer span{color:var(--a1)}
+  .t-svc{--cls-color:#38bdf8}.t-pipe{--cls-color:#60a5fa}.t-valve{--cls-color:#34d399}.t-hyd{--cls-color:#fb923c}.t-meter{--cls-color:#f472b6}.t-fit{--cls-color:#a78bfa}.t-mh{--cls-color:#facc15}.t-cham{--cls-color:#94a3b8}.t-sfitting{--cls-color:#2dd4bf}.t-tank{--cls-color:#86efac}.t-sp{--cls-color:#fca5a5}.t-pump{--cls-color:#fb7185}.t-fill{--cls-color:#38bdf8}.t-treat{--cls-color:#4ade80}.t-stor{--cls-color:#7dd3fc}.t-mech{--cls-color:#f97316}.t-instr{--cls-color:#c084fc}.t-ctrl{--cls-color:#facc15}.t-elec{--cls-color:#fbbf24}
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <header>
+    <div class="hbadge">💧 LCC Asset Data Model</div>
+    <h1>Water Supply <span>Data Schema</span></h1>
+    <p>ADAC water supply feature architecture — pipes, valves, meters, hydrants, fittings, storage, mechanical, instrumentation, control and electrical. Click cards to expand full details.</p>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat-pill"><span class="stat-num">19</span><span class="stat-label">Feature Classes</span></div>
+    <div class="stat-pill"><span class="stat-num">35+</span><span class="stat-label">Sub-features</span></div>
+    <div class="stat-pill"><span class="stat-num">250+</span><span class="stat-label">Attributes</span></div>
+    <div class="stat-pill"><span class="stat-num">500+</span><span class="stat-label">Enum Values</span></div>
+    <div class="stat-pill"><span class="stat-num">9</span><span class="stat-label">Water Quality Types</span></div>
+    <div class="stat-pill"><span class="stat-num">6</span><span class="stat-label">Schema Groups</span></div>
+  </div>
+
+  <div class="arch-overview">
+    <div class="arch-title">▸ Schema Hierarchy</div>
+    <div class="arch-flow">
+      <div class="arch-tier"><div class="arch-tier-label">Asset</div><div class="arch-tier-box arch-root">WaterSupply</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier"><div class="arch-tier-label">Groups</div><div class="arch-tier-box">Network</div><div class="arch-tier-box">Infrastructure</div><div class="arch-tier-box">Mechanical</div><div class="arch-tier-box">Instrumentation</div><div class="arch-tier-box">Control</div><div class="arch-tier-box">Electrical</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier"><div class="arch-tier-label">Feature Class</div><div class="arch-tier-box">WaterServices</div><div class="arch-tier-box">Pipes / Valves</div><div class="arch-tier-box">Hydrants / Meters</div><div class="arch-tier-box">Fittings / MH</div><div class="arch-tier-box">Pump / Generator</div><div class="arch-tier-box">Motor / Switchboard</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier"><div class="arch-tier-label">Key Attributes</div><div class="arch-tier-box">Diameter_mm</div><div class="arch-tier-box">Material / Class</div><div class="arch-tier-box">Lining / Protection</div><div class="arch-tier-box">JointType</div><div class="arch-tier-box">WaterQuality</div><div class="arch-tier-box">Geometry</div></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier"><div class="arch-tier-label">Shared Enum</div><div class="arch-tier-box" style="font-size:9px">Drinking Water</div><div class="arch-tier-box" style="font-size:9px">Recycled A / A+</div><div class="arch-tier-box" style="font-size:9px">Ground / Rain Water</div><div class="arch-tier-box" style="font-size:9px">Treated Effluent</div><div class="arch-tier-box" style="font-size:9px">Raw / Process Water</div></div>
+    </div>
+  </div>
+
+  <div class="wq-bar">
+    <div class="wq-bar-label">⚡ Shared WaterQuality Enumeration — applies to: WaterServices · Pipes · Valves · Hydrants · Meters · Fittings · ServiceFittings · Filling Stations</div>
+    Drinking Water · Recycled A+ · Recycled A · Treated Effluent · Rain Water · Raw Water · Ground Water · Process Water · Other · Unknown
+  </div>
+
+  <!-- GROUP 1: NETWORK -->
+  <div class="section-label">▸ <span>01</span> Network Features</div>
+  <div class="schema-grid">
+
+    <!-- WaterServices -->
+    <div class="fc-card t-svc">
+      <div class="fc-header"><div class="fc-icon">🔌</div><div class="fc-title-group"><div class="fc-class-name">WaterServices</div><div class="fc-title">Domestic Water Services</div></div><div class="fc-badge">Point</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Domestic connections ≤DN63. Material, class, protection, termination and water quality.</div>
+        <div class="fg"><div class="fgl">Pipe Properties</div>
+          <div class="fr"><span class="fn">Diameter_mm</span><span class="ft">20–63mm</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Material</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">DI</span><span class="et">Copper</span><span class="et">PE</span><span class="et">M_1</span><span class="et">Other</span><span class="et">Unknown</span></div>
+          <div class="fr"><span class="fn">Class</span><span class="ft">PN6–PN35 / Type A</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Protection</span><span class="ft">Conduit/None/Other</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Termination</span><span class="ft">Ball Valve/No Valve</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">WaterQuality</span><span class="ft">Enum (shared)</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Length_m</span><span class="ft">Float+</span><span class="fm o">○ N</span></div>
+        </div>
+        <div class="gc">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <!-- Pipes -->
+    <div class="fc-card t-pipe">
+      <div class="fc-header"><div class="fc-icon">⬛</div><div class="fc-title-group"><div class="fc-class-name">Pipes</div><div class="fc-title">Water Supply Mains</div></div><div class="fc-badge">Polyline</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">All water mains from domestic services to trunk mains. Full material, class, lining, protection, joint and embedment data.</div>
+        <div class="fg"><div class="fgl">Use &amp; Classification</div>
+          <div class="fr"><span class="fn">Use</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">Reticulation</span><span class="et">Trunk</span><span class="et">Service</span><span class="et">Fire Service</span><span class="et">Scour</span><span class="et">Disused</span><span class="et">Irrigation</span><span class="et">Conduit</span><span class="et">Waste</span><span class="em">+6</span></div>
+          <div class="fr"><span class="fn">Diameter_mm</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">WaterQuality</span><span class="ft">Enum (shared)</span><span class="fm">★ M</span></div>
+        </div>
+        <div class="fg"><div class="fgl">Material &amp; Spec</div>
+          <div class="fr"><span class="fn">Material</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">DI</span><span class="et">PVC-U/M/O</span><span class="et">PE-100/80B</span><span class="et">GRP</span><span class="et">MS</span><span class="et">SS</span><span class="et">Copper</span><span class="et">RCP</span><span class="et">AC</span><span class="em">+4</span></div>
+          <div class="fr"><span class="fn">Class</span><span class="ft">30+ values</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">PN6–PN35</span><span class="et">FLCL</span><span class="et">Type A/B</span><span class="et">4.8–16mm</span><span class="et">SN5000–10000</span></div>
+          <div class="fr"><span class="fn">Lining</span><span class="ft">CL/CL_SR/FBE/PVC</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Protection</span><span class="ft">FBE/FBPE/Zinc/Epoxy…</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">JointType</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">RRJ</span><span class="et">RRRJ</span><span class="et">SWJ</span><span class="et">WJ</span><span class="et">FJ</span><span class="et">MCJ</span><span class="et">BW</span><span class="et">EFW</span></div>
+          <div class="fr"><span class="fn">Length_m</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+        </div>
+        <div class="ftog" onclick="toggleDetails(this)">▸ EMBEDMENT &amp; DEPTH</div>
+        <div class="fdet"><div class="scr">
+          <div class="fg"><div class="fgl">Embedment</div>
+            <div class="fr"><span class="fn">Embedment</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+            <div class="ew"><span class="et">Natural</span><span class="et">GBH</span><span class="et">GBS</span><span class="et">GBSonConc</span><span class="et">GBSonGTP</span><span class="et">ConcBS</span><span class="et">Above Ground</span><span class="et">None (TBored)</span><span class="em">+8</span></div>
+            <div class="fr"><span class="fn">Depth_m</span><span class="ft">Float (avg)</span><span class="fm o">○ N</span></div>
+            <div class="fr"><span class="fn">InternalDia_mm</span><span class="ft">posInt</span><span class="fm o">○ N</span></div>
+            <div class="fr"><span class="fn">Alignment_m</span><span class="ft">Float+ (cadastral offset)</span><span class="fm o">○ N</span></div>
+          </div>
+          <div class="gc">◆ geometry_linear_singlepath_simple</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- Valves -->
+    <div class="fc-card t-valve">
+      <div class="fc-header"><div class="fc-icon">🔴</div><div class="fc-title-group"><div class="fc-class-name">Valves</div><div class="fc-title">Water Supply Valves</div></div><div class="fc-badge">Point</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">All valve types — non-return, stop, scour, pressure control, gas release and service valves.</div>
+        <div class="fg"><div class="fgl">Use &amp; Type</div>
+          <div class="fr"><span class="fn">Use</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">Non-Return</span><span class="et">Stop</span><span class="et">Scour</span><span class="et">Diversion</span><span class="et">Zone Boundary</span><span class="et">Flow Control</span><span class="et">Pressure Ctrl</span><span class="et">Gas Release</span><span class="et">Service</span></div>
+          <div class="fr"><span class="fn">Type</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">Gate</span><span class="et">Butterfly</span><span class="et">Ball Valve</span><span class="et">Globe</span><span class="et">RPZ</span><span class="et">Altitude</span><span class="et">Air Valve</span><span class="et">Swing Check</span><span class="et">Vee Ported</span><span class="em">+10</span></div>
+        </div>
+        <div class="fg"><div class="fgl">Specifications</div>
+          <div class="fr"><span class="fn">Diameter_mm</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Lining</span><span class="ft">CL/CL_SR/FBE…</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Material / JointType</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Manufacturer</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Actuated</span><span class="ft">Boolean</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Pressure (kPa)</span><span class="ft">posInt</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">WaterQuality</span><span class="ft">Enum (shared)</span><span class="fm">★ M</span></div>
+        </div>
+        <div class="gc">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <!-- Hydrants -->
+    <div class="fc-card t-hyd">
+      <div class="fc-header"><div class="fc-icon">🚒</div><div class="fc-title-group"><div class="fc-class-name">Hydrants</div><div class="fc-title">Fire &amp; Filling Hydrants</div></div><div class="fc-badge">Point</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Spring, pillar and filling point hydrants with diameter, location and water quality.</div>
+        <div class="fg">
+          <div class="fr"><span class="fn">Use</span><span class="ft">Spring/Filling/Pillar</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Diameter_mm</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Camlock Dia (mm)</span><span class="ft">posInt</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">Hydrant Location</span><span class="ft">String_64</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">WaterQuality</span><span class="ft">Enum (shared)</span><span class="fm">★ M</span></div>
+        </div>
+        <div class="gc">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <!-- Meters -->
+    <div class="fc-card t-meter">
+      <div class="fc-header"><div class="fc-icon">📊</div><div class="fc-title-group"><div class="fc-class-name">Meters</div><div class="fc-title">Water Supply Meters</div></div><div class="fc-badge">Point</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Volumetric, magflow, turbine and irrigation meters with serial, offset, lot/plan and install date.</div>
+        <div class="fg"><div class="fgl">Identity</div>
+          <div class="fr"><span class="fn">Serial Number</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Type</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">Conventional</span><span class="et">Manifold</span><span class="et">Magflow</span><span class="et">Turbine</span><span class="et">Irrigation</span></div>
+          <div class="fr"><span class="fn">Diameter_mm</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">PrivateBooster</span><span class="ft">boolean</span><span class="fm">★ M</span></div>
+        </div>
+        <div class="fg"><div class="fgl">Location &amp; Install</div>
+          <div class="fr"><span class="fn">OffsetSide</span><span class="ft">Left / Right</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Offset_m</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">InstallationDate</span><span class="ft">ISO 8601 date</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">LotNo / PlanNo</span><span class="ft">String_32</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">WaterQuality</span><span class="ft">Enum (shared)</span><span class="fm">★ M</span></div>
+        </div>
+        <div class="gc">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <!-- Fittings -->
+    <div class="fc-card t-fit">
+      <div class="fc-header"><div class="fc-icon">🔩</div><div class="fc-title-group"><div class="fc-class-name">Fittings</div><div class="fc-title">Pipe Fittings</div></div><div class="fc-badge">Point</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Bends, tees, wyes, reducers, cathodic protection, booster pumps and sampling points.</div>
+        <div class="fg"><div class="fgl">Type</div>
+          <div class="fr"><span class="fn">Type</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">Bend</span><span class="et">Tee</span><span class="et">Wye</span><span class="et">Taper</span><span class="et">Cross Conn.</span><span class="et">Dead Plate</span><span class="et">Puddle Flange</span><span class="et">Ready Tap</span><span class="et">Booster Pump</span><span class="et">Surge Vessel</span><span class="et">Sampling Pt</span><span class="et">Flush Point</span><span class="et">Saddle</span><span class="em">+7</span></div>
+        </div>
+        <div class="fg"><div class="fgl">Material &amp; Corrosion</div>
+          <div class="fr"><span class="fn">Material</span><span class="ft">DI/Brass/Cu/PVC/PE/MS</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Lining</span><span class="ft">CL/FBE/PVC/Unlined</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Protection</span><span class="ft">FBE/FBPE/Zinc/Tape…</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">BodySize_mm</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">BranchSize_mm</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">WaterQuality</span><span class="ft">Enum (shared)</span><span class="fm">★ M</span></div>
+        </div>
+        <div class="gc">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <!-- MaintenanceHoles -->
+    <div class="fc-card t-mh">
+      <div class="fc-header"><div class="fc-icon">🕳️</div><div class="fc-title-group"><div class="fc-class-name">MaintenanceHoles</div><div class="fc-title">Valve Pits &amp; Pump Stations</div></div><div class="fc-badge">Point</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Water supply access holes — valve pits, pump stations and pressure regulation chambers.</div>
+        <div class="fg"><div class="fgl">Use &amp; Chamber</div>
+          <div class="fr"><span class="fn">Use</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">Valve Pit</span><span class="et">Complex</span><span class="et">Pump Station</span><span class="et">Pressure Reg</span><span class="et">Disused</span><span class="et">Temp Works</span></div>
+          <div class="fr"><span class="fn">ChamberSize</span><span class="ft">Container</span><span class="fm">★ M</span></div>
+          <div class="sf"><div class="fr"><span class="fn">Rect: L×W (mm)</span><span class="ft">posInt</span></div><div class="fr"><span class="fn">Circ: Dia (mm)</span><span class="ft">posInt</span></div></div>
+          <div class="fr"><span class="fn">SurfaceLevel_m</span><span class="ft">Float</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">InvertLevel_m</span><span class="ft">Float</span><span class="fm">★ M</span></div>
+        </div>
+        <div class="ftog" onclick="toggleDetails(this)">▸ FLOOR / WALL / ROOF / LID MATERIALS</div>
+        <div class="fdet"><div class="scr">
+          <div class="fg">
+            <div class="fr"><span class="fn">FloorConstruction</span><span class="ft">Prefab/Insitu</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">FloorMaterial</span><span class="ft">PVC/PE/PP/GRP/Conc</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">WallConstruction</span><span class="ft">Prefab/Insitu</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">WallMaterial</span><span class="ft">PVC/PE/PP/GRP/Conc</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">RoofMaterial</span><span class="ft">Enum (15 options)</span><span class="fm">★ M</span></div>
+            <div class="ew"><span class="et">Concrete</span><span class="et">MS</span><span class="et">Aluminium</span><span class="et">Grid Mesh GRP</span><span class="et">Grid Mesh SS</span><span class="et">No Roof</span></div>
+            <div class="fr"><span class="fn">LidMaterial</span><span class="ft">Enum (15 options)</span><span class="fm">★ M</span></div>
+            <div class="ew"><span class="et">Aluminium</span><span class="et">Cast Iron</span><span class="et">CI Conc Infill</span><span class="et">GRP</span><span class="et">PVC</span><span class="et">SS</span><span class="et">No Lid</span></div>
+          </div>
+          <div class="gc">◆ geometry_point_singlepoint</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- Chambers/Pits -->
+    <div class="fc-card t-cham">
+      <div class="fc-header"><div class="fc-icon">⬡</div><div class="fc-title-group"><div class="fc-class-name">Chambers / Pits</div><div class="fc-title">Access Chambers</div></div><div class="fc-badge">Point</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Generic chamber/pit with shape, construction, lining, safety fittings and volume.</div>
+        <div class="fg"><div class="fgl">Configuration</div>
+          <div class="fr"><span class="fn">Chambershape</span><span class="ft">CIRC/RECT/SQ/EXT/CUSTOM</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Construction</span><span class="ft">INSITU/PREFAB</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Type</span><span class="ft">MH/M_BOX/PIT/PUMPWELL</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Use</span><span class="ft">FLW_M/OP_INSP/ENTRY</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Lid Type</span><span class="ft">Enum (10 types)</span><span class="fm">★ M</span></div>
+        </div>
+        <div class="fg"><div class="fgl">Dimensions &amp; Safety</div>
+          <div class="fr"><span class="fn">Diameter / L × W</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">SurfaceLevel / Invert</span><span class="ft">float</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Depth_m</span><span class="ft">Float</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Volume_m3</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Handrails / SafetyGrille</span><span class="ft">Boolean</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Lining</span><span class="ft">PVC/Epoxy/PE/Polyurea</span><span class="fm">★ M</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ServiceFittings -->
+    <div class="fc-card t-sfitting">
+      <div class="fc-header"><div class="fc-icon">🚿</div><div class="fc-title-group"><div class="fc-class-name">ServiceFittings</div><div class="fc-title">End-User Service Fittings</div></div><div class="fc-badge">Point</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Customer-facing fittings — taps, fountains, irrigation spray heads, showers and decorative features.</div>
+        <div class="fg">
+          <div class="fr"><span class="fn">Type</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">Tap</span><span class="et">Drinking Fountain</span><span class="et">Pop Up Sprinkler</span><span class="et">Spray Nozzle</span><span class="et">Shower</span><span class="et">Dog Bowl</span><span class="et">Drip Line</span><span class="et">Filter</span><span class="et">Filling Station</span><span class="et">Fountain Deco</span><span class="et">Hot Water Sys</span><span class="et">Nipple</span><span class="et">Goose Neck</span></div>
+          <div class="fr"><span class="fn">BelowGround</span><span class="ft">boolean</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">WaterSaver</span><span class="ft">boolean</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">AutoShutOff</span><span class="ft">boolean</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">WaterQuality</span><span class="ft">Enum (shared)</span><span class="fm">★ M</span></div>
+        </div>
+        <div class="gc">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- GROUP 2: INFRASTRUCTURE -->
+  <div class="section-label">▸ <span>02</span> Infrastructure &amp; Storage</div>
+  <div class="schema-grid">
+
+    <div class="fc-card t-tank">
+      <div class="fc-header"><div class="fc-icon">🛢️</div><div class="fc-title-group"><div class="fc-class-name">StorageTanks</div><div class="fc-title">Domestic Storage Tanks</div></div><div class="fc-badge">Point</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Domestic rainwater and groundwater tanks. Not for bulk mains infrastructure.</div>
+        <div class="fg">
+          <div class="fr"><span class="fn">Material</span><span class="ft">Plastic/Steel/Conc</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Source</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+          <div class="ew"><span class="et">Rain Water</span><span class="et">Ground Water</span><span class="et">Ponded Water</span><span class="et">Mains Service</span></div>
+          <div class="fr"><span class="fn">Volume_m3</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Manufacturer / Model</span><span class="ft">String_64</span><span class="fm o">○ N</span></div>
+        </div>
+        <div class="gc">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <div class="fc-card t-sp">
+      <div class="fc-header"><div class="fc-icon">🔧</div><div class="fc-title-group"><div class="fc-class-name">Metered Hydrant Standpipes</div><div class="fc-title">Standpipes</div></div><div class="fc-badge">Asset Register</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Metered standpipes tracked individually with hire status and serial numbers.</div>
+        <div class="fg">
+          <div class="fr"><span class="fn">Standpipe No</span><span class="ft">Float</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">On/Off Hire</span><span class="ft">String_32</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Manufacturer</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">ModelNumber</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Serial Number</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Location Desc</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fc-card t-pump">
+      <div class="fc-header"><div class="fc-icon">⚙️</div><div class="fc-title-group"><div class="fc-class-name">Water Pump Stations</div><div class="fc-title">Pump Station Summary</div></div><div class="fc-badge">Station Asset</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Station-level summary — duty head/flow, generator plug, chlorination and control flags.</div>
+        <div class="fg">
+          <div class="fr"><span class="fn">No of Pumps</span><span class="ft">posInt</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">Duty Head (m)</span><span class="ft">posInt</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">Duty Flow (l/s)</span><span class="ft">posInt</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">Generator Plug</span><span class="ft">boolean</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Generator Plug Loc</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Continuous Running</span><span class="ft">boolean</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">Pressure Controls</span><span class="ft">boolean</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">Chlorination Y/N</span><span class="ft">boolean</span><span class="fm o">○ N</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fc-card t-fill">
+      <div class="fc-header"><div class="fc-icon">💧</div><div class="fc-title-group"><div class="fc-class-name">Filling Stations</div><div class="fc-title">Potable Water Filling</div></div><div class="fc-badge">Point</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Card-accessed public potable water filling points.</div>
+        <div class="fg">
+          <div class="fr"><span class="fn">Diameter_mm</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">WaterQuality</span><span class="ft">Enum (shared)</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Rotation</span><span class="ft">Float_Dir</span><span class="fm o">○ N</span></div>
+        </div>
+        <div class="gc">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <div class="fc-card t-treat">
+      <div class="fc-header"><div class="fc-icon">🏭</div><div class="fc-title-group"><div class="fc-class-name">Water Treatment Plants</div><div class="fc-title">WTP Summary</div></div><div class="fc-badge">Facility Asset</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Treatment plant summary — processes, capacity and dates.</div>
+        <div class="fg">
+          <div class="fr"><span class="fn">Water Source</span><span class="ft">String_32</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">Design Capacity</span><span class="ft">posInt</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">Avg Daily Prod.</span><span class="ft">posInt</span><span class="fm o">○ N</span></div>
+          <div class="fr"><span class="fn">Initial Constr / Last Upgrade</span><span class="ft">date</span><span class="fm o">○ N</span></div>
+        </div>
+        <div class="fg"><div class="fgl">Treatment Processes (All Boolean)</div>
+          <div class="ew"><span class="et">Flocculation</span><span class="et">Sedimentation</span><span class="et">Filtration</span><span class="et">Fluoridation</span><span class="et">Pre-Chlorine</span><span class="et">Post-Chlorine</span><span class="et">Corrosion Ctrl</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fc-card t-stor">
+      <div class="fc-header"><div class="fc-icon">🏗️</div><div class="fc-title-group"><div class="fc-class-name">Water Storage Facilities</div><div class="fc-title">Bulk Storage Reservoirs</div></div><div class="fc-badge">Facility Asset</div></div>
+      <div class="fc-body">
+        <div class="fc-desc">Bulk water storage — tanks, reservoirs and ponds in the mains distribution network.</div>
+        <div class="fg">
+          <div class="fr"><span class="fn">Material</span><span class="ft">Plastic/Steel/Other</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Source</span><span class="ft">Ground/Mains/Ponded/Rain</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Shape</span><span class="ft">Circular/Rect/Horse-Shoe…</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Volume_m3</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Diameter / Depth / Width</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">Roof / Ext/Int Ladder</span><span class="ft">boolean</span><span class="fm">★ M</span></div>
+          <div class="fr"><span class="fn">3rd Party Equip</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- GROUP 3: MECHANICAL -->
+  <div class="section-label">▸ <span>03</span> Mechanical Services</div>
+  <div class="schema-grid">
+    <div class="fc-card t-mech span2">
+      <div class="fc-header"><div class="fc-icon">🔩</div><div class="fc-title-group"><div class="fc-class-name">Mechanical Services</div><div class="fc-title">Pumps · Actuators · Cranes · Generators · Pressure Vessels · Mixers</div></div><div class="fc-badge">8 sub-types</div></div>
+      <div class="fc-body">
+        <div class="sg">
+          <div class="sp"><div class="sl">Pump</div>
+            <div class="fr"><span class="fn">Use</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+            <div class="ew"><span class="et">Transport</span><span class="et">Sump</span><span class="et">Chem Dosing</span><span class="et">Vacuum</span><span class="em">+9</span></div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+            <div class="ew"><span class="et">Centrifugal</span><span class="et">Submersible</span><span class="et">Diaphragm</span><span class="et">Peristaltic</span><span class="et">Grinder</span><span class="em">+5</span></div>
+            <div class="fr"><span class="fn">Power / Current / Speed</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Duty Flow (l/s) / Head (m)</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Impellr / Suction / Dschge dia</span><span class="ft">posInt (mm)</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Efficiency % / Curve No.</span><span class="ft">Float+ / posInt</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">Generator</div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">Fixed/Mobile</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Engine Size (kVA)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Power Output (kW)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Fuel Tank (L)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Fuel Type</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+            <div class="ew"><span class="et">Diesel</span><span class="et">Natural Gas</span><span class="et">Petrol ULP</span><span class="et">Propane</span></div>
+            <div class="fr"><span class="fn">Quantity</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">Actuator</div>
+            <div class="fr"><span class="fn">Base Type</span><span class="ft">Direct/Gearbox/Manual</span><span class="fm o">○ N</span></div>
+            <div class="fr"><span class="fn">Coupling</span><span class="ft">Elec/Hydraulic/Pneumatic</span><span class="fm o">○ N</span></div>
+            <div class="fr"><span class="fn">Power / Torque / Speed</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Voltage (V)</span><span class="ft">24V/240V/415V…</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">Pressure Vessel</div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">Air Rec./Gas/Surge</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Diameter_mm</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Volume_m3</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Pressure (bar)</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">Fixed Cranes (Structure/Carriage/Trolley/Hoist)</div>
+            <div class="fr"><span class="fn">Crane Number</span><span class="ft">String_32</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Capacity (kg)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Classification</span><span class="ft">M1–M8 / C1–C9</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Last Maj. Assess</span><span class="ft">Date</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">Mixer / Agitator</div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">Submersible/Surface</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Power (kW)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Speed (rpm)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Prop Dia (mm)</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GROUP 4: INSTRUMENTATION -->
+  <div class="section-label">▸ <span>04</span> Instrumentation</div>
+  <div class="schema-grid">
+    <div class="fc-card t-instr span2">
+      <div class="fc-header"><div class="fc-icon">📡</div><div class="fc-title-group"><div class="fc-class-name">Instrumentation</div><div class="fc-title">Flow Meters · Sensors · Analysers</div></div><div class="fc-badge">3 sub-types</div></div>
+      <div class="fc-body">
+        <div class="sg">
+          <div class="sp"><div class="sl">Flow Meter</div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">Magflow/Turbine/Conv…</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Diameter_mm</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Tube Material</span><span class="ft">String_32</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Output Signal</span><span class="ft">String_32</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Bi-Directional</span><span class="ft">boolean</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">InitialReading</span><span class="ft">integer</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Accuracy / Velocity Range</span><span class="ft">Float+ / posInt</span><span class="fm o">○ N</span></div>
+          </div>
+          <div class="sp"><div class="sl">Sensor</div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">Enum</span><span class="fm">★ M</span></div>
+            <div class="ew"><span class="et">BF (Ball Float)</span><span class="et">HLT (Hydrostatic)</span><span class="et">MP (Multitrode)</span><span class="et">PM (Pressure Mon)</span><span class="et">RLT (Radar)</span><span class="et">ULT (Ultrasonic)</span><span class="et">OL (Odour)</span></div>
+            <div class="fr"><span class="fn">Measuring Range (m)</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Output Signal</span><span class="ft">String_32</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Voltage (V)</span><span class="ft">Enum (10 levels)</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">Analyser</div>
+            <div class="fr"><span class="fn">Voltage (V)</span><span class="ft">Enum (10 levels)</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Size</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Manufacturer / Model / Serial</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Location Description</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GROUP 5: CONTROL -->
+  <div class="section-label">▸ <span>05</span> Control Systems</div>
+  <div class="schema-grid">
+    <div class="fc-card t-ctrl span2">
+      <div class="fc-header"><div class="fc-icon">🖥️</div><div class="fc-title-group"><div class="fc-class-name">Control</div><div class="fc-title">RTU · PLC · Radios · Antennas · Backup Comms</div></div><div class="fc-badge">5 sub-types</div></div>
+      <div class="fc-body">
+        <div class="sg">
+          <div class="sp"><div class="sl">Remote Terminal Unit (RTU)</div>
+            <div class="fr"><span class="fn">CPU Manufacturer</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">CPU Model</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Serial Number</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">PLC</div>
+            <div class="fr"><span class="fn">CPU Manufacturer / Model</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Remote I/O Manuf. / Model</span><span class="ft">String_64</span><span class="fm o">○ N</span></div>
+          </div>
+          <div class="sp"><div class="sl">Radio / Backup Comms</div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">MOD/RAD/NA</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Power (W)</span><span class="ft">Float+</span><span class="fm o">○ N</span></div>
+            <div class="fr"><span class="fn">Voltage (V)</span><span class="ft">Enum (10 levels)</span><span class="fm o">○ N</span></div>
+          </div>
+          <div class="sp"><div class="sl">Antenna</div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">ANT / TBD</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Height (mm)</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Material</span><span class="ft">String_32</span><span class="fm">★ M</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GROUP 6: ELECTRICAL -->
+  <div class="section-label">▸ <span>06</span> Electrical</div>
+  <div class="schema-grid">
+    <div class="fc-card t-elec span2">
+      <div class="fc-header"><div class="fc-icon">⚡</div><div class="fc-title-group"><div class="fc-class-name">Electrical</div><div class="fc-title">Motors · Drives · Solar · UPS · Switchboards · Transformers · AC Units</div></div><div class="fc-badge">12 sub-types</div></div>
+      <div class="fc-body">
+        <div class="sg">
+          <div class="sp"><div class="sl">Motor</div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">AC/DC/Induction/Servo</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Power / Current / Torque</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Mount Type</span><span class="ft">FL_MOUNT/FO_MOUNT</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">InsulationType</span><span class="ft">CLASS A–H</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">IP Rating</span><span class="ft">String_32</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Efficiency % / Speed (rpm)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">Variable Speed Drive</div>
+            <div class="fr"><span class="fn">Power (kW)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Frequency (Hz)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Current (A)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Voltage (V)</span><span class="ft">Enum (10 levels)</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Max Output (Hz)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">Switchboard</div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">Main SB / Dist Board / Mech SB</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Separation Form</span><span class="ft">Form 1–4b</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">IP Rating</span><span class="ft">String_32</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">RCD Fitted</span><span class="ft">Boolean</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Power (kW) / Config</span><span class="ft">Float+ / String</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">Solar Panel &amp; Inverter</div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">Mono/Poly/Thin-film</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Max Power Pmax (W)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">No. of Panels</span><span class="ft">posInt</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Inverter Capacity (kW)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">UPS</div>
+            <div class="fr"><span class="fn">Type</span><span class="ft">Standby/Line-Int/Dual</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Battery Type</span><span class="ft">Lithium/Lead Acid/VRLA</span><span class="fm o">○ N</span></div>
+            <div class="fr"><span class="fn">Power Output (kVA)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Runtime (hrs)</span><span class="ft">Float+</span><span class="fm o">○ N</span></div>
+            <div class="fr"><span class="fn">Voltage (V)</span><span class="ft">Enum (10 levels)</span><span class="fm">★ M</span></div>
+          </div>
+          <div class="sp"><div class="sl">Transformer · Soft Starter · DOL · Cathodic Prot. · AC Unit</div>
+            <div class="fr"><span class="fn">Power (kW)</span><span class="ft">Float+</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Voltage / Current</span><span class="ft">Float+ / Enum</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">AC Unit: Type/Phase/Refrigerant</span><span class="ft">Enum/posInt/Str</span><span class="fm">★ M</span></div>
+            <div class="fr"><span class="fn">Manufacturer / Model / Serial</span><span class="ft">String_64</span><span class="fm">★ M</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="li"><span class="ld" style="background:var(--warn)"></span>★ M = Mandatory</div>
+    <div class="li"><span class="ld" style="background:var(--muted)"></span>○ N = Optional</div>
+    <div class="li"><span class="ld" style="background:var(--a7)"></span>◆ = Geometry type</div>
+    <div class="li"><span class="ld" style="background:var(--a2)"></span>WQ = WaterQuality (shared 9-value enum)</div>
+    <div class="li"><span class="ld" style="background:var(--a1)"></span>LCC = Council-specific</div>
+    <div class="li"><span class="ld" style="background:var(--a2)"></span>▸ = Click to expand</div>
+  </div>
+  <footer><span>WaterSupply</span> Asset Data Schema · LCC Spatial Data Model · ADAC Water Supply Feature Architecture</footer>
+</div>
+<script>
+function toggleDetails(btn){
+  const d=btn.nextElementSibling;
+  const o=d.classList.contains('open');
+  d.classList.toggle('open',!o);
+  btn.textContent=o?btn.textContent.replace('▾','▸'):btn.textContent.replace('▸','▾');
+  btn.style.color=o?'':'var(--a1)';
+}
+</script>
+</body>
+</html>

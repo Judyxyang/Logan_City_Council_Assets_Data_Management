@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transport Data Schema — Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent1: #00c8ff;
+    --accent2: #00ff9d;
+    --accent3: #ff6b6b;
+    --accent4: #ffd166;
+    --accent5: #c77dff;
+    --accent6: #ff9e00;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --tag-bg: rgba(0,200,255,0.08);
+    --tag-border: rgba(0,200,255,0.25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  header .label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--accent1);
+    margin-bottom: 12px;
+  }
+  header h1 {
+    font-size: clamp(28px, 4vw, 52px);
+    font-weight: 300;
+    color: #fff;
+    letter-spacing: -1px;
+    line-height: 1.1;
+  }
+  header h1 span { color: var(--accent1); font-weight: 600; }
+  header p {
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 15px;
+    max-width: 600px;
+    margin-inline: auto;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 40px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .legend-item:hover { color: var(--text); border-color: var(--accent1); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* Root node */
+  .root-node {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .root-box {
+    display: inline-block;
+    background: linear-gradient(135deg, #0a1628, #0d1f3c);
+    border: 2px solid var(--accent1);
+    border-radius: 12px;
+    padding: 18px 40px;
+    box-shadow: 0 0 40px rgba(0,200,255,0.15), inset 0 0 20px rgba(0,200,255,0.03);
+  }
+  .root-box .root-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent1);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .root-box h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.5px;
+  }
+  .root-box p {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* Connector line from root */
+  .connector-root {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0;
+    height: 30px;
+  }
+  .connector-root::after {
+    content: '';
+    width: 2px;
+    height: 100%;
+    background: linear-gradient(to bottom, var(--accent1), transparent);
+  }
+
+  /* Feature classes grid */
+  .schema-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+    margin-top: 0;
+  }
+
+  /* Feature class card */
+  .fc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    cursor: pointer;
+  }
+  .fc-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  }
+
+  .fc-header {
+    padding: 14px 16px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .fc-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .fc-title-group { flex: 1; min-width: 0; }
+  .fc-class-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .fc-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .fc-badge {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 2px 7px;
+    border-radius: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Features list */
+  .fc-body {
+    padding: 12px 16px;
+  }
+  .fc-desc {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+
+  .feature-group { margin-bottom: 12px; }
+  .feature-group:last-child { margin-bottom: 0; }
+  .feature-group-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .feature-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .feature-name {
+    color: var(--text);
+    font-weight: 500;
+    flex-shrink: 0;
+    min-width: 110px;
+  }
+  .feature-type {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .feature-mandatory {
+    font-size: 10px;
+    color: var(--accent3);
+    margin-left: auto;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .feature-mandatory.opt { color: var(--muted); font-weight: 400; }
+
+  /* Enum tags */
+  .enum-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+  }
+  .enum-tag {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    color: var(--accent1);
+  }
+  .enum-more {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    padding: 1px 6px;
+    cursor: pointer;
+  }
+
+  /* Sub-feature nested */
+  .sub-feature {
+    margin-left: 14px;
+    padding-left: 10px;
+    border-left: 2px solid var(--border);
+    margin-top: 4px;
+  }
+  .sub-feature .feature-row { font-size: 11px; }
+  .sub-feature .feature-name { min-width: 90px; color: var(--muted); }
+
+  /* Geometry chip */
+  .geom-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 3px 8px;
+    background: rgba(255,209,102,0.08);
+    border: 1px solid rgba(255,209,102,0.2);
+    border-radius: 6px;
+    color: var(--accent4);
+    margin-top: 6px;
+  }
+
+  /* Expand/collapse */
+  .fc-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px;
+    background: var(--surface2);
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+  }
+  .fc-toggle:hover { color: var(--text); background: var(--border); }
+  .fc-details { display: none; padding: 12px 16px; border-top: 1px solid var(--border); }
+  .fc-details.open { display: block; }
+
+  /* Color themes per class */
+  .theme-road    { --cls-color: #00c8ff; }
+  .theme-parking { --cls-color: #00ff9d; }
+  .theme-edge    { --cls-color: #ff6b6b; }
+  .theme-island  { --cls-color: #ffd166; }
+  .theme-pathway { --cls-color: #c77dff; }
+  .theme-bridge  { --cls-color: #ff9e00; }
+  .theme-safety  { --cls-color: #ff6b6b; }
+  .theme-signal  { --cls-color: #00ff9d; }
+  .theme-marking { --cls-color: #c77dff; }
+  .theme-bus     { --cls-color: #ffd166; }
+  .theme-signs   { --cls-color: #ff9e00; }
+  .theme-drain   { --cls-color: #00c8ff; }
+  .theme-pram    { --cls-color: #ff6b6b; }
+
+  .fc-card:hover { border-color: var(--cls-color); }
+  .fc-card:hover .fc-header { box-shadow: inset 0 0 20px rgba(var(--cls-color-rgb), 0.05); }
+  .fc-class-name { color: var(--cls-color); }
+  .fc-icon { background: color-mix(in srgb, var(--cls-color) 15%, transparent); }
+  .fc-badge {
+    background: color-mix(in srgb, var(--cls-color) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--cls-color) 30%, transparent);
+    color: var(--cls-color);
+  }
+
+  /* Architecture overview section */
+  .arch-overview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+  .arch-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .arch-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .arch-tier {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 120px;
+  }
+  .arch-tier-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .arch-tier-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .arch-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--muted);
+    font-size: 18px;
+    padding: 0 8px;
+    padding-top: 20px;
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 32px;
+    justify-content: center;
+  }
+  .stat-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 40px;
+    padding: 8px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stat-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent1);
+    line-height: 1;
+  }
+  .stat-label { font-size: 12px; color: var(--muted); }
+
+  /* Tooltip */
+  [data-tooltip] { position: relative; }
+  [data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a2235;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 11px;
+    padding: 5px 9px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  /* Scrollable details */
+  .scrollable { max-height: 300px; overflow-y: auto; padding-right: 4px; }
+  .scrollable::-webkit-scrollbar { width: 4px; }
+  .scrollable::-webkit-scrollbar-track { background: transparent; }
+  .scrollable::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    margin-top: 60px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+  footer span { color: var(--accent1); }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="label">LCC Asset Data Model</div>
+    <h1>Transport <span>Data Schema</span></h1>
+    <p>Road-related feature architecture — click any card to explore full attribute details</p>
+  </header>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-pill"><span class="stat-num">13</span><span class="stat-label">Feature Classes</span></div>
+    <div class="stat-pill"><span class="stat-num">24</span><span class="stat-label">Sub-features</span></div>
+    <div class="stat-pill"><span class="stat-num">180+</span><span class="stat-label">Attributes</span></div>
+    <div class="stat-pill"><span class="stat-num">400+</span><span class="stat-label">Enum Values</span></div>
+  </div>
+
+  <!-- Architecture overview -->
+  <div class="arch-overview">
+    <div class="arch-title">▸ Schema Hierarchy</div>
+    <div class="arch-flow">
+      <div class="arch-tier">
+        <div class="arch-tier-label">Asset</div>
+        <div class="arch-tier-box" style="border-color:var(--accent1);color:var(--accent1);font-weight:700">Transport</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Feature Class</div>
+        <div class="arch-tier-box">PavementAreas</div>
+        <div class="arch-tier-box">ParkingAreas</div>
+        <div class="arch-tier-box">RoadEdges</div>
+        <div class="arch-tier-box">RoadIslands</div>
+        <div class="arch-tier-box">Pathways</div>
+        <div class="arch-tier-box">Bridges</div>
+        <div class="arch-tier-box">+ 7 more…</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Feature</div>
+        <div class="arch-tier-box">Pavement</div>
+        <div class="arch-tier-box">Parking</div>
+        <div class="arch-tier-box">RoadEdge</div>
+        <div class="arch-tier-box">BridgeExtent</div>
+        <div class="arch-tier-box">BridgeDeck</div>
+        <div class="arch-tier-box">+ more…</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Attribute</div>
+        <div class="arch-tier-box">Name / Type</div>
+        <div class="arch-tier-box">Surface</div>
+        <div class="arch-tier-box">PavementStructure</div>
+        <div class="arch-tier-box">SubGrade</div>
+        <div class="arch-tier-box">Geometry</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Enumeration</div>
+        <div class="arch-tier-box" style="font-size:11px">Sealed / Unsealed / Earth</div>
+        <div class="arch-tier-box" style="font-size:11px">LOC / RRS / PRV / STA</div>
+        <div class="arch-tier-box" style="font-size:11px">Flexible / Rigid</div>
+        <div class="arch-tier-box" style="font-size:11px">Lime / Cement / Geogrid</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Schema Grid -->
+  <div class="schema-grid">
+
+    <!-- 1. PavementAreas -->
+    <div class="fc-card theme-road">
+      <div class="fc-header">
+        <div class="fc-icon">🛣️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">PavementAreas</div>
+          <div class="fc-title">Road Pavement</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Feature class of road pavement areas. Captures road name, classification, surface, structure and subgrade data.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Identity</div>
+          <div class="feature-row"><span class="feature-name">Name</span><span class="feature-type">String_254</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">AssetType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Sealed</span><span class="enum-tag">Unsealed</span><span class="enum-tag">Earth</span><span class="enum-tag">Unformed</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">RoadCategory</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">LOC</span><span class="enum-tag">RRS</span><span class="enum-tag">PRV</span><span class="enum-tag">STA</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">RoadType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">U - Urban</span><span class="enum-tag">R - Rural</span></div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Classification</div>
+          <div class="feature-row"><span class="feature-name">Road Class</span><span class="feature-type">Austroads</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">National (HV)</span><span class="enum-tag">National</span><span class="enum-tag">Regional</span><span class="enum-tag">Arterial</span>
+            <span class="enum-tag">Pri. Collector</span><span class="enum-tag">Sec. Collector</span><span class="enum-tag">Access</span><span class="enum-tag">Access (LV)</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Hierarchy</span><span class="feature-type">1–11</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">1-Urban Access</span><span class="enum-tag">4-Arterial</span><span class="enum-tag">7-Rural Access</span><span class="enum-tag">10-Main Roads</span><span class="enum-more">+7</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">WayCode</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">A-Two Way</span><span class="enum-tag">B-Divided</span><span class="enum-tag">C-Country</span><span class="enum-tag">U-Unformed</span>
+          </div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Extents</div>
+          <div class="feature-row"><span class="feature-name">FromStreet</span><span class="feature-type">String</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">FromCode</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">ToStreet</span><span class="feature-type">String</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">ToCode</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">BA-Bridge Abut</span><span class="enum-tag">CL-Cross St</span><span class="enum-tag">CS-Cul-De-Sac</span><span class="enum-tag">DE-Dead End</span><span class="enum-more">+6</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Segment Length</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+
+        <div class="fc-toggle" onclick="toggleDetails(this)">▸ SURFACE &amp; STRUCTURE DETAILS</div>
+        <div class="fc-details">
+          <div class="scrollable">
+          <div class="feature-group">
+            <div class="feature-group-label">Surface</div>
+            <div class="feature-row"><span class="feature-name">SurfaceType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap">
+              <span class="enum-tag">1CBS</span><span class="enum-tag">2CBS</span><span class="enum-tag">AC</span><span class="enum-tag">BPAV</span><span class="enum-tag">Concrete</span><span class="enum-tag">CPAV</span><span class="enum-tag">DUST</span><span class="enum-tag">Earth</span><span class="enum-tag">FDA</span><span class="enum-tag">GCELL</span><span class="enum-tag">GRVL</span><span class="enum-tag">PMB</span><span class="enum-tag">SMA</span><span class="enum-tag">SSSL</span>
+            </div>
+            <div class="feature-row mt-4"><span class="feature-name">SurfaceThickness</span><span class="feature-type">posInt (mm)</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">SurfaceNomWidth</span><span class="feature-type">Float+ (m)</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">TrafficWidth</span><span class="feature-type">Float+ (m)</span><span class="feature-mandatory">★ M</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">Pavement Structure</div>
+            <div class="feature-row"><span class="feature-name">PavementType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Flexible</span><span class="enum-tag">Rigid</span><span class="enum-tag">Floodway</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">BaseLayer</span><span class="feature-type">Container</span></div>
+            <div class="sub-feature">
+              <div class="feature-row"><span class="feature-name">LayerType</span><span class="feature-type">Enum</span></div>
+              <div class="enum-wrap"><span class="enum-tag">GR21-GR90</span><span class="enum-tag">NGRL</span><span class="enum-tag">Earth</span><span class="enum-tag">AC</span><span class="enum-tag">Concrete</span></div>
+              <div class="feature-row mt-4"><span class="feature-name">LayerDepth_mm</span><span class="feature-type">Float+</span></div>
+              <div class="feature-row"><span class="feature-name">Stabilisation</span><span class="feature-type">Enum</span></div>
+              <div class="enum-wrap"><span class="enum-tag">Lime</span><span class="enum-tag">Foamed Bitumen</span><span class="enum-tag">Geogrid</span><span class="enum-tag">Cement</span></div>
+            </div>
+            <div class="feature-row mt-4"><span class="feature-name">SubBaseLayer</span><span class="feature-type">Container</span></div>
+            <div class="feature-row"><span class="feature-name">LowerSubBase</span><span class="feature-type">Container</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">Geosynthetics</div>
+            <div class="feature-row"><span class="feature-name">PavGeosynthetic</span><span class="feature-type">Enum</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Geogrid</span><span class="enum-tag">Geotextile</span><span class="enum-tag">Geocomposite</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">PavGeoTextile</span><span class="feature-type">Class A–E</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">GeosynProduct</span><span class="feature-type">String_32</span><span class="feature-mandatory opt">○ N</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">SubGrade</div>
+            <div class="feature-row"><span class="feature-name">CBR</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Stabilisation</span><span class="feature-type">Enum</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">CBR Method</span><span class="feature-type">Enum</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="enum-wrap"><span class="enum-tag">APVL</span><span class="enum-tag">EST1</span><span class="enum-tag">FWD</span><span class="enum-tag">HIST</span><span class="enum-tag">ND</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">Environment / Terrain</div>
+            <div class="feature-row"><span class="feature-name">EnvironmentID</span><span class="feature-type">0–4</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="enum-wrap"><span class="enum-tag">1-Dry Non-React</span><span class="enum-tag">2-Dry React</span><span class="enum-tag">3-Wet Non-React</span><span class="enum-tag">4-Wet React</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">TerrainID</span><span class="feature-type">0–3</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="enum-wrap"><span class="enum-tag">1-Level</span><span class="enum-tag">2-Mountainous</span><span class="enum-tag">3-Rolling</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">StereotypeID</span><span class="feature-type">0–6</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="enum-wrap"><span class="enum-tag">A-Unformed</span><span class="enum-tag">B-Unsealed</span><span class="enum-tag">C-Single CW</span><span class="enum-tag">D-Full Std</span><span class="enum-tag">E-Undivided</span><span class="enum-tag">F-Local</span></div>
+          </div>
+          <div class="geom-chip">◆ geometry_area_multipatch_complex (Mandatory)</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 2. ParkingAreas -->
+    <div class="fc-card theme-parking">
+      <div class="fc-header">
+        <div class="fc-icon">🅿️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">ParkingAreas</div>
+          <div class="fc-title">Parking</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Feature class for on-street and off-street parking areas including bay counts, surface and structure.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Core Attributes</div>
+          <div class="feature-row"><span class="feature-name">Name</span><span class="feature-type">String_254</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">OnOffStreet</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">On Street</span><span class="enum-tag">Off Street</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">ParkingType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Angle</span><span class="enum-tag">Bay</span><span class="enum-tag">Lane</span><span class="enum-tag">Open Area</span><span class="enum-tag">Parallel</span></div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">Bay Counts</div>
+          <div class="feature-row"><span class="feature-name">NoOfCarparks</span><span class="feature-type">posInt</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">DDACompliant Bays</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">ChargingBays</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">BusBays</span><span class="feature-type">posInt</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">WheelStops</span><span class="feature-type">posInt</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">FrequencyUse</span><span class="feature-type">String_64</span><span class="feature-mandatory opt">○ N</span></div>
+        </div>
+        <div class="fc-toggle" onclick="toggleDetails(this)">▸ SURFACE &amp; STRUCTURE DETAILS</div>
+        <div class="fc-details">
+          <div class="scrollable">
+          <div class="feature-group">
+            <div class="feature-group-label">Surface</div>
+            <div class="feature-row"><span class="feature-name">SurfaceType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">AC</span><span class="enum-tag">Concrete</span><span class="enum-tag">BPAV</span><span class="enum-tag">CPAV</span><span class="enum-tag">GRVL</span><span class="enum-tag">PMB</span><span class="enum-more">+8</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">SurfaceThickness</span><span class="feature-type">posInt (mm)</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">SurfaceArea_sqm</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">Pavement Structure</div>
+            <div class="feature-row"><span class="feature-name">PavementType</span><span class="feature-type">Flex/Rigid/Flood</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">BaseLayer</span><span class="feature-type">Container</span></div>
+            <div class="sub-feature">
+              <div class="feature-row"><span class="feature-name">LayerType</span><span class="feature-type">GR21–GR25, AC, Conc</span></div>
+              <div class="feature-row"><span class="feature-name">LayerDepth_mm</span><span class="feature-type">Float+</span></div>
+              <div class="feature-row"><span class="feature-name">Stabilisation</span><span class="feature-type">Lime/FB/Geogrid/Cement</span></div>
+            </div>
+            <div class="feature-row mt-4"><span class="feature-name">SubBaseLayer</span><span class="feature-type">Container (optional)</span></div>
+            <div class="feature-row"><span class="feature-name">LowerSubBase</span><span class="feature-type">Container (optional)</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">SubGrade</div>
+            <div class="feature-row"><span class="feature-name">CBR</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Stabilisation</span><span class="feature-type">Enum</span><span class="feature-mandatory opt">○ N</span></div>
+          </div>
+          <div class="geom-chip">◆ geometry_area_multipatch_complex (Mandatory)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. RoadEdges -->
+    <div class="fc-card theme-edge">
+      <div class="fc-header">
+        <div class="fc-icon">🔩</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">RoadEdges</div>
+          <div class="fc-title">Kerb &amp; Channel</div>
+        </div>
+        <div class="fc-badge">Polyline</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Edge features of pavement areas — kerbs, channels and edge restraints.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Configuration</div>
+          <div class="feature-row"><span class="feature-name">Type</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Barrier Kerb</span><span class="enum-tag">Barrier K+C</span><span class="enum-tag">Semi-Mount K</span><span class="enum-tag">Mountable K</span><span class="enum-tag">Channel</span><span class="enum-tag">Edge Restraint</span><span class="enum-tag">Separation K</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Material</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Concrete</span><span class="enum-tag">RC</span><span class="enum-tag">Asphalt</span><span class="enum-tag">Other</span></div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">Dimensions</div>
+          <div class="feature-row"><span class="feature-name">Width_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Length_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">PavExtension_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_linear_multipath_complex</div>
+      </div>
+    </div>
+
+    <!-- 4. RoadIslands -->
+    <div class="fc-card theme-island">
+      <div class="fc-header">
+        <div class="fc-icon">🔄</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">RoadIslands</div>
+          <div class="fc-title">Islands &amp; Medians</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Road islands, traffic calming features, medians, roundabouts and LATM structures.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Type</div>
+          <div class="feature-row"><span class="feature-name">Type</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Roundabout</span><span class="enum-tag">Splitter Island</span><span class="enum-tag">Ped. Refuge</span><span class="enum-tag">Center Median</span><span class="enum-tag">Chicane</span><span class="enum-tag">LATM</span><span class="enum-tag">Road Hump</span><span class="enum-tag">Island</span>
+          </div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">Infill (Primary &amp; Secondary)</div>
+          <div class="feature-row"><span class="feature-name">Area_sqm</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">InfillType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">AC</span><span class="enum-tag">Concrete</span><span class="enum-tag">Grass</span><span class="enum-tag">Landscape</span><span class="enum-tag">Pavers</span><span class="enum-tag">Rubber</span><span class="enum-tag">BPAV</span><span class="enum-tag">CPAV</span><span class="enum-tag">Exp. Agg</span><span class="enum-tag">Stamp Asphalt</span><span class="enum-more">+5</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">InfillType2</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Area2_sqm</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_area_multipatch_complex</div>
+      </div>
+    </div>
+
+    <!-- 5. Pathways -->
+    <div class="fc-card theme-pathway">
+      <div class="fc-header">
+        <div class="fc-icon">🚶</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">Pathways</div>
+          <div class="fc-title">Paths &amp; Cycleways</div>
+        </div>
+        <div class="fc-badge">Polyline</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">On-ground footpaths and cycleways. Three sub-types: Pathway (in-ground), RoadPathway (on-road), PathStructure (bridge/boardwalk).</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Use &amp; Surface</div>
+          <div class="feature-row"><span class="feature-name">Use</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Shared</span><span class="enum-tag">CycleWay</span><span class="enum-tag">Pedestrian</span><span class="enum-tag">Horse Trail</span><span class="enum-tag">MTB</span><span class="enum-tag">Concourse</span><span class="enum-tag">Fire Trail</span><span class="enum-tag">On-road CW</span><span class="enum-tag">Ramp</span><span class="enum-tag">Stairs</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Structure</span><span class="feature-type">In Ground</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">SurfaceMaterial</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Concrete</span><span class="enum-tag">CPAV</span><span class="enum-tag">BPAV</span><span class="enum-tag">Bitumen</span><span class="enum-tag">Gravel</span><span class="enum-tag">Earth</span><span class="enum-tag">Steel</span><span class="enum-tag">Timber</span><span class="enum-tag">Spray Seal</span>
+          </div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">Dimensions</div>
+          <div class="feature-row"><span class="feature-name">Length_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Width_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Depth_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Grade (°)</span><span class="feature-type">Float_Dir</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">Crossfall (°)</span><span class="feature-type">Float_Dir</span><span class="feature-mandatory opt">○ N</span></div>
+        </div>
+        <div class="fc-toggle" onclick="toggleDetails(this)">▸ SUB-TYPES: RoadPathway &amp; PathStructure</div>
+        <div class="fc-details">
+          <div class="feature-group">
+            <div class="feature-group-label">RoadPathway (On-Road Cycleway)</div>
+            <div class="feature-row"><span class="feature-name">Use</span><span class="feature-type">CycleWay (locked)</span></div>
+            <div class="feature-row"><span class="feature-name">Structure</span><span class="feature-type">On Road (locked)</span></div>
+            <div class="feature-row"><span class="feature-name">SurfaceMaterial</span><span class="feature-type">Road Pav (locked)</span></div>
+            <div class="feature-row"><span class="feature-name">Width_m</span><span class="feature-type">Float+</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">PathStructure (Boardwalk / Foot Bridge)</div>
+            <div class="feature-row"><span class="feature-name">Structure</span><span class="feature-type">Enum</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Boardwalk</span><span class="enum-tag">Causeway</span><span class="enum-tag">Foot Bridge</span><span class="enum-tag">Stairs</span><span class="enum-tag">Ramp</span><span class="enum-tag">Underpass</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">SubStructureMat</span><span class="feature-type">Enum</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Concrete</span><span class="enum-tag">Steel</span><span class="enum-tag">Stone</span><span class="enum-tag">Brick</span><span class="enum-tag">Timber</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">Width_m</span><span class="feature-type">Float+</span></div>
+          </div>
+          <div class="geom-chip">◆ geometry_linear_singlepath_complex</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. PramRamps -->
+    <div class="fc-card theme-pram">
+      <div class="fc-header">
+        <div class="fc-icon">♿</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">PramRamps</div>
+          <div class="fc-title">Disabled Access Points</div>
+        </div>
+        <div class="fc-badge">Point / Poly</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Pram ramps and DDA entry points adjacent to pathway network. Two sub-types: point and polygon.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">PramRamp (Point)</div>
+          <div class="feature-row"><span class="feature-name">Tactiles</span><span class="feature-type">boolean</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">Rotation</span><span class="feature-type">Float_Dir</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="geom-chip">◆ geometry_point_singlepoint</div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">PramRampPolygon (Area)</div>
+          <div class="feature-row"><span class="feature-name">Rotation</span><span class="feature-type">Float_Dir</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="geom-chip">◆ geometry_area_singlepatch_complex</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. RoadSafetyBarriers -->
+    <div class="fc-card theme-safety">
+      <div class="fc-header">
+        <div class="fc-icon">🛡️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">RoadSafetyBarriers</div>
+          <div class="fc-title">Safety Barriers</div>
+        </div>
+        <div class="fc-badge">Polyline</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Road safety barriers including wire rope, W-beam, concrete and terminals.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Barrier Type</div>
+          <div class="feature-row"><span class="feature-name">Type</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Flexible</span><span class="enum-tag">Semi-rigid</span><span class="enum-tag">Rigid</span><span class="enum-tag">Flex/Rigid Combo</span><span class="enum-tag">Energy-abs Bollard</span><span class="enum-tag">Energy-abs Terminal</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">RailType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Steel</span><span class="enum-tag">Timber</span><span class="enum-tag">Concrete</span><span class="enum-tag">Other</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">PostType</span><span class="feature-type">Enum</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Steel</span><span class="enum-tag">Timber</span><span class="enum-tag">Concrete</span></div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">End Treatments</div>
+          <div class="feature-row"><span class="feature-name">LeadingEnd</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">TrailingEnd</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Breakmaster</span><span class="enum-tag">ET2000 Plus</span><span class="enum-tag">FLEAT</span><span class="enum-tag">MELT</span><span class="enum-tag">Bull Nose</span><span class="enum-tag">Fishtail</span><span class="enum-tag">NEAT</span><span class="enum-tag">SBCT</span><span class="enum-more">+10</span>
+          </div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">Dimensions &amp; Safety</div>
+          <div class="feature-row"><span class="feature-name">Length_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Height_m</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">PostSpacing_m</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">Motorcyclist Prot</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Rub Rail</span><span class="enum-tag">Hiasa Rail</span><span class="enum-tag">None</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">PedProt Sheeting</span><span class="feature-type">boolean</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">BridgeTransition</span><span class="feature-type">boolean</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">NumberOfBollards</span><span class="feature-type">posInt</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">H.Alignment</span><span class="feature-type">Straight/Cvx/Ccv</span><span class="feature-mandatory opt">○ N</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_linear_multipath_complex</div>
+      </div>
+    </div>
+
+    <!-- 8. Bridges -->
+    <div class="fc-card theme-bridge" style="grid-column: span 2;">
+      <div class="fc-header">
+        <div class="fc-icon">🌉</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">Bridges</div>
+          <div class="fc-title">Bridge Assemblies — 8 Component Sub-types</div>
+        </div>
+        <div class="fc-badge">Multi-component</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Complete bridge data model. Components linked via shared BridgeID. Barrier, Pathway and Kerb captured in their own feature classes and related back.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px">
+            <div class="feature-group-label" style="margin-bottom:8px">BridgeExtent (Assembly Level)</div>
+            <div class="feature-row"><span class="feature-name">BridgeID</span><span class="feature-type">String_64</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Name</span><span class="feature-type">String_254</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">Use</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Road</span><span class="enum-tag">Ped/Cycle</span><span class="enum-tag">Rail</span><span class="enum-tag">Fauna</span><span class="enum-tag">Stock</span><span class="enum-tag">Shared</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">Type</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Beam</span><span class="enum-tag">Arch</span><span class="enum-tag">Box Girder</span><span class="enum-tag">Cantilever</span><span class="enum-tag">Slab</span><span class="enum-tag">Suspension</span><span class="enum-more">+8</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">CrossingType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Fresh Water</span><span class="enum-tag">Land</span><span class="enum-tag">Rail</span><span class="enum-tag">Road</span><span class="enum-tag">Salt Water</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">Spans / SpanLen</span><span class="feature-type">posInt / String</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">NomWidth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">TrafficWidth</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">DeckLength_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">PredominantMat</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">RC</span><span class="enum-tag">Steel</span><span class="enum-tag">Timber</span><span class="enum-tag">PSC Precast</span><span class="enum-tag">Fibre Comp</span><span class="enum-more">+5</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">DesignCode</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">AS5100-2004</span><span class="enum-tag">AS5100-2017</span><span class="enum-tag">Austroads</span><span class="enum-tag">NASSRA</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">DesignLoad</span><span class="feature-type">Enum</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="enum-wrap"><span class="enum-tag">SM1600</span><span class="enum-tag">T44</span><span class="enum-tag">M1600</span><span class="enum-more">+8</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">AADT / AADT_HV</span><span class="feature-type">posInt</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="geom-chip">◆ geometry_area_singlepatch_complex</div>
+          </div>
+
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px">
+            <div class="feature-group-label" style="margin-bottom:8px">BridgeSuperstructure</div>
+            <div class="feature-row"><span class="feature-name">BridgeID</span><span class="feature-type">String_64</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Material</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">RC</span><span class="enum-tag">Steel</span><span class="enum-tag">Timber</span><span class="enum-tag">PSC Precast</span><span class="enum-tag">Fibre Comp</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">ExpansionJoint</span><span class="feature-type">Enum</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Asphaltic Plug</span><span class="enum-tag">Buried Joint</span><span class="enum-tag">Compression Seal</span><span class="enum-tag">Open Joint</span><span class="enum-more">+4</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">JointLength</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="geom-chip">◆ geometry_area_multipatch_complex</div>
+          </div>
+
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px">
+            <div class="feature-group-label" style="margin-bottom:8px">BridgeBearing</div>
+            <div class="feature-row"><span class="feature-name">BearingType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Elastomeric</span><span class="enum-tag">Pot</span><span class="enum-tag">Rockers</span><span class="enum-tag">Sliding</span><span class="enum-tag">Steel Lam</span><span class="enum-tag">Mortar Pads</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">BearingMaterial</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Composite</span><span class="enum-tag">Concrete</span><span class="enum-tag">Steel</span><span class="enum-tag">Other</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">BearingQuantity</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          </div>
+
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px">
+            <div class="feature-group-label" style="margin-bottom:8px">BridgeDeck</div>
+            <div class="feature-row"><span class="feature-name">BridgeID</span><span class="feature-type">String_64</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Material</span><span class="feature-type">Enum</span></div>
+            <div class="enum-wrap"><span class="enum-tag">RC</span><span class="enum-tag">Steel</span><span class="enum-tag">Timber</span><span class="enum-tag">PSC Precast</span><span class="enum-tag">Fibre Comp</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">NomWidth_m</span><span class="feature-type">Float+</span></div>
+            <div class="feature-row"><span class="feature-name">DeckLength_m</span><span class="feature-type">Float+</span></div>
+            <div class="geom-chip">◆ geometry_area_multipatch_complex</div>
+          </div>
+
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px">
+            <div class="feature-group-label" style="margin-bottom:8px">BridgeAbutment &amp; Pier</div>
+            <div class="feature-row"><span class="feature-name">BridgeID</span><span class="feature-type">String_64</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Material</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">RC</span><span class="enum-tag">In-situ RC</span><span class="enum-tag">Steel</span><span class="enum-tag">Timber</span><span class="enum-tag">Masonry</span><span class="enum-tag">Comp. Aggr</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">PierQuantity</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+            <div class="geom-chip">◆ geometry_area_multipatch_complex</div>
+          </div>
+
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px">
+            <div class="feature-group-label" style="margin-bottom:8px">BridgeSubstructure &amp; Foundation</div>
+            <div class="feature-row"><span class="feature-name">HeadstockType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">HeadstockMat.</span><span class="feature-type">Enum</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Timber</span><span class="enum-tag">Steel</span><span class="enum-tag">Masonry</span><span class="enum-tag">RC</span><span class="enum-tag">Cast-in-situ</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">HeadstockArea</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Foundation</span><span class="feature-type">Enum</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Bored Piles</span><span class="enum-tag">Driven Piles</span><span class="enum-tag">Spread ftg</span><span class="enum-tag">N/A</span></div>
+          </div>
+
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px">
+            <div class="feature-group-label" style="margin-bottom:8px">ContainmentClass</div>
+            <div class="feature-row"><span class="feature-name">BridgeID</span><span class="feature-type">String_64</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">ContainmentClass</span><span class="feature-type">Enum (AS5100)</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Low</span><span class="enum-tag">Regular</span><span class="enum-tag">Medium</span><span class="enum-tag">Special</span></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 9. SubSoilDrains & FlushPoints -->
+    <div class="fc-card theme-drain">
+      <div class="fc-header">
+        <div class="fc-icon">💧</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">SubSoilDrains</div>
+          <div class="fc-title">Sub-soil Drainage</div>
+        </div>
+        <div class="fc-badge">Polyline / Point</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Road sub-soil drains and associated flush/cleanout points.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">SubSoilDrain</div>
+          <div class="feature-row"><span class="feature-name">Use</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Side Drain</span><span class="enum-tag">Mitre Drain</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">Type</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Perforated Pipe</span><span class="enum-tag">Strip Filter</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">Length_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="geom-chip">◆ geometry_linear_singlepath_simple</div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">FlushPoint</div>
+          <div class="feature-row"><span class="feature-name">Function</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Cleanout</span><span class="enum-tag">Surface Outlet</span></div>
+          <div class="geom-chip">◆ geometry_point_singlepoint</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10. BusStopInfrastructure -->
+    <div class="fc-card theme-bus">
+      <div class="fc-header">
+        <div class="fc-icon">🚌</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">BusStopInfrastructure</div>
+          <div class="fc-title">Bus Stop Assets</div>
+        </div>
+        <div class="fc-badge">Point</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Bus stop infrastructure per PTIM standard — shelter type, furniture, DDA compliance, marker and terrain.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Stop Classification</div>
+          <div class="feature-row"><span class="feature-name">BusStopType</span><span class="feature-type">Enum (PTIM)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Minimum boarding</span><span class="enum-tag">Regular stop</span><span class="enum-tag">Intermediate</span><span class="enum-tag">Premium</span><span class="enum-tag">Non-standard</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">BusStopFurniture</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Seat (no ad)</span><span class="enum-tag">Seat (ad)</span><span class="enum-tag">Std Shelter</span><span class="enum-tag">Non-illum Ad</span><span class="enum-tag">Illum Ad</span><span class="enum-tag">Non-standard</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Terrain</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Active Lane</span><span class="enum-tag">Stopping Lane</span><span class="enum-tag">Unsealed Shldr</span><span class="enum-tag">Sealed BS</span><span class="enum-tag">Bus Terminal</span></div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">Marker &amp; Access</div>
+          <div class="feature-row"><span class="feature-name">MarkerType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Flag Pole</span><span class="enum-tag">Blade Sign</span><span class="enum-tag">Regional J Pole</span><span class="enum-tag">Regional Blade</span><span class="enum-tag">Virtual Stop</span><span class="enum-tag">No sign</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">MarkerName</span><span class="feature-type">String_64</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">HardstandArea</span><span class="feature-type">posInt (m²)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">DDACompliant</span><span class="feature-type">boolean</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">PointOfSupply</span><span class="feature-type">String_32</span><span class="feature-mandatory opt">○ N</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <!-- 11. TrafficSignals -->
+    <div class="fc-card theme-signal">
+      <div class="fc-header">
+        <div class="fc-icon">🚦</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">TrafficSignals</div>
+          <div class="fc-title">Signalised Intersections</div>
+        </div>
+        <div class="fc-badge">Point</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">LCC Specific: Traffic signal sites with controller, software, pole and detector loop inventory.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Identity</div>
+          <div class="feature-row"><span class="feature-name">SiteIntersection</span><span class="feature-type">String_64</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Signal_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Controller_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">SignalType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">3 Way</span><span class="enum-tag">4 Way</span><span class="enum-tag">5 Way</span><span class="enum-tag">Pedestrian</span></div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">Hardware Inventory</div>
+          <div class="feature-row"><span class="feature-name">ControllerQty</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">ControllerType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Tyco</span><span class="enum-tag">ATC</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">SystemSoftware</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">TRAFF</span><span class="enum-tag">QTRAFF</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">CablePit</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">NoOfPoles</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">NoOfLoops</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">NoOfLanterns</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">PointOfSupply</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <!-- 12. LineMarking -->
+    <div class="fc-card theme-marking">
+      <div class="fc-header">
+        <div class="fc-icon">🎨</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">LineMarking</div>
+          <div class="fc-title">Pavement Markings</div>
+        </div>
+        <div class="fc-badge">Line/Area/Point</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">LCC Specific: Three sub-types covering all MUTCD pavement marking types — lines, areas and symbols.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">LineMarkingLine (Polyline)</div>
+          <div class="feature-row"><span class="feature-name">MarkingType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Single Line</span><span class="enum-tag">Double Line</span><span class="enum-tag">Centre Line</span><span class="enum-tag">Lane Line</span><span class="enum-tag">Turn Line</span><span class="enum-tag">Stop Line</span><span class="enum-tag">Give Way</span><span class="enum-tag">Continuity</span><span class="enum-tag">Ped X-walk</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Material</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">HAP</span><span class="enum-tag">CAP</span><span class="enum-tag">MMA</span><span class="enum-tag">Water Based</span><span class="enum-tag">Other</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">Colour</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">White</span><span class="enum-tag">Yellow</span><span class="enum-tag">Blue</span><span class="enum-tag">Red</span><span class="enum-tag">Green</span><span class="enum-tag">Multiple</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">Length_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="fc-toggle" onclick="toggleDetails(this)">▸ AREA &amp; SYMBOL SUB-TYPES</div>
+        <div class="fc-details">
+          <div class="feature-group">
+            <div class="feature-group-label">LineMarkingArea (Polygon)</div>
+            <div class="feature-row"><span class="feature-name">MarkingType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Chevron</span><span class="enum-tag">Bike Paths</span><span class="enum-tag">Thresholds</span><span class="enum-tag">Ped Crossing</span><span class="enum-tag">LATM</span><span class="enum-tag">Speed Humps</span><span class="enum-tag">School Zones</span><span class="enum-tag">Bus Lanes</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">Area_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="geom-chip">◆ geometry_area_multipatch_complex</div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">LineMarkingOther (Point)</div>
+            <div class="feature-row"><span class="feature-name">MarkingType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Pavement Arrows</span><span class="enum-tag">Symbol</span><span class="enum-tag">Lettering</span></div>
+            <div class="geom-chip">◆ geometry_point_singlepoint</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 13. LTMS -->
+    <div class="fc-card theme-signs">
+      <div class="fc-header">
+        <div class="fc-icon">⚠️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">Large Traffic Mgmt Signs</div>
+          <div class="fc-title">Gantries &amp; LTMS</div>
+        </div>
+        <div class="fc-badge">Point</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">LCC Specific: Large traffic management sign structures and gantries.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Structure Type</div>
+          <div class="feature-row"><span class="feature-name">Type</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Overpass</span><span class="enum-tag">Cantilever</span><span class="enum-tag">Free Standing</span><span class="enum-tag">Gantry</span><span class="enum-tag">Mast/Monopole</span><span class="enum-tag">Portal Gantry</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">Material</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Steel</span><span class="enum-tag">Timber</span><span class="enum-tag">Other</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">BaseType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Slip Base</span><span class="enum-tag">Fixed Base</span><span class="enum-tag">Other</span></div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">Sign Details</div>
+          <div class="feature-row"><span class="feature-name">MUTCD Reference</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Width_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Height_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">SignText</span><span class="feature-type">String_256</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">NumberOfPosts</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">MinClearance_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+  </div><!-- end grid -->
+
+  <!-- Key -->
+  <div class="legend" style="margin-top:32px">
+    <div class="legend-item"><span class="legend-dot" style="background:var(--accent3)"></span>★ M = Mandatory field</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--muted)"></span>○ N = Optional field</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--accent4)"></span>◆ = Geometry type</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--accent1)"></span>LCC = Council-specific attribute</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--accent2)"></span>▸ = Click to expand details</div>
+  </div>
+
+  <footer>
+    <span>Transport</span> Asset Data Schema · LCC Spatial Data Model · Road-related Feature Architecture
+  </footer>
+</div>
+
+<script>
+  function toggleDetails(btn) {
+    const details = btn.nextElementSibling;
+    const isOpen = details.classList.contains('open');
+    details.classList.toggle('open', !isOpen);
+    btn.textContent = isOpen
+      ? btn.textContent.replace('▾', '▸')
+      : btn.textContent.replace('▸', '▾');
+    btn.style.color = isOpen ? '' : 'var(--accent1)';
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StormWater Data Schema — Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #060d18;
+    --surface: #0d1b2a;
+    --surface2: #112236;
+    --border: #1a2e44;
+    --accent1: #00d4ff;
+    --accent2: #00ffb3;
+    --accent3: #4fc3f7;
+    --accent4: #b3e5fc;
+    --accent5: #0077b6;
+    --accent6: #48cae4;
+    --warn: #ff6b6b;
+    --text: #dde8f0;
+    --muted: #5a7a90;
+    --tag-bg: rgba(0,212,255,0.07);
+    --tag-border: rgba(0,212,255,0.22);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated water ripple background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(ellipse at 20% 80%, rgba(0,119,182,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(0,212,255,0.06) 0%, transparent 50%),
+      linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 50px 50px, 50px 50px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 44px;
+  }
+  .header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent1);
+    margin-bottom: 14px;
+  }
+  .header-badge::before { content: '💧'; font-size: 12px; }
+  header h1 {
+    font-size: clamp(26px, 4vw, 50px);
+    font-weight: 300;
+    color: #fff;
+    letter-spacing: -1px;
+    line-height: 1.1;
+  }
+  header h1 span { color: var(--accent1); font-weight: 600; }
+  header p {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 580px;
+    margin-inline: auto;
+    line-height: 1.6;
+  }
+
+  /* Stats */
+  .stats-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 30px;
+    justify-content: center;
+  }
+  .stat-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 40px;
+    padding: 7px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stat-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent1);
+    line-height: 1;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); }
+
+  /* Arch overview */
+  .arch-overview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 30px;
+  }
+  .arch-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .arch-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .arch-tier {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    min-width: 110px;
+  }
+  .arch-tier-label {
+    font-size: 9px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .arch-tier-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 6px 12px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    width: 100%;
+  }
+  .arch-tier-root {
+    border-color: var(--accent1);
+    color: var(--accent1);
+    font-weight: 700;
+    font-size: 13px;
+    box-shadow: 0 0 20px rgba(0,212,255,0.12);
+  }
+  .arch-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--muted);
+    font-size: 16px;
+    padding: 0 6px;
+    padding-top: 22px;
+  }
+
+  /* Schema grid */
+  .schema-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 14px;
+  }
+  .span2 { grid-column: span 2; }
+
+  /* Card */
+  .fc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  }
+  .fc-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    border-color: var(--cls-color, var(--accent1));
+  }
+
+  .fc-header {
+    padding: 13px 15px 11px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .fc-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0;
+    background: color-mix(in srgb, var(--cls-color, #00d4ff) 15%, transparent);
+  }
+  .fc-title-group { flex: 1; min-width: 0; }
+  .fc-class-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    color: var(--cls-color, var(--accent1));
+  }
+  .fc-title { font-size: 14px; font-weight: 600; color: #fff; }
+  .fc-badge {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 2px 7px;
+    border-radius: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    background: color-mix(in srgb, var(--cls-color, #00d4ff) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--cls-color, #00d4ff) 28%, transparent);
+    color: var(--cls-color, var(--accent1));
+  }
+
+  .fc-body { padding: 12px 15px; }
+  .fc-desc { font-size: 12px; color: var(--muted); margin-bottom: 11px; line-height: 1.5; }
+
+  .feature-group { margin-bottom: 11px; }
+  .feature-group:last-child { margin-bottom: 0; }
+  .feature-group-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 5px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .feature-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    margin-bottom: 3px;
+    font-size: 12px;
+  }
+  .feature-name { color: var(--text); font-weight: 500; flex-shrink: 0; min-width: 120px; }
+  .feature-type { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); flex-shrink: 0; }
+  .feature-mandatory { font-size: 10px; color: var(--warn); margin-left: auto; font-weight: 700; flex-shrink: 0; }
+  .feature-mandatory.opt { color: var(--muted); font-weight: 400; }
+
+  .enum-wrap { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; margin-bottom: 4px; }
+  .enum-tag {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    color: var(--accent1);
+  }
+  .enum-more { font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; padding: 1px 4px; }
+
+  .sub-feature {
+    margin-left: 12px;
+    padding-left: 10px;
+    border-left: 2px solid var(--border);
+    margin-top: 3px;
+  }
+  .sub-feature .feature-row { font-size: 11px; }
+  .sub-feature .feature-name { min-width: 100px; color: var(--muted); }
+
+  .geom-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 3px 8px;
+    background: rgba(0,212,255,0.07);
+    border: 1px solid rgba(0,212,255,0.18);
+    border-radius: 6px;
+    color: var(--accent3);
+    margin-top: 7px;
+  }
+
+  .fc-toggle {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 7px;
+    background: var(--surface2);
+    font-size: 10px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+    border-top: 1px solid var(--border);
+  }
+  .fc-toggle:hover { color: var(--accent1); background: rgba(0,212,255,0.05); }
+  .fc-details { display: none; padding: 12px 15px; border-top: 1px solid var(--border); }
+  .fc-details.open { display: block; }
+
+  .scrollable { max-height: 320px; overflow-y: auto; padding-right: 4px; }
+  .scrollable::-webkit-scrollbar { width: 3px; }
+  .scrollable::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Sub-type panel */
+  .subtype-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 9px;
+    margin-top: 10px;
+  }
+  .subtype-panel {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .subtype-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent1);
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Legend */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    justify-content: center;
+    margin-top: 30px; margin-bottom: 10px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+  .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+  footer {
+    text-align: center;
+    margin-top: 50px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+  footer span { color: var(--accent1); }
+
+  /* Color themes */
+  .t-pit    { --cls-color: #00d4ff; }
+  .t-end    { --cls-color: #48cae4; }
+  .t-fit    { --cls-color: #90e0ef; }
+  .t-culv   { --cls-color: #0096c7; }
+  .t-pipe   { --cls-color: #0077b6; }
+  .t-drain  { --cls-color: #00b4d8; }
+  .t-wsudp  { --cls-color: #00ff9d; }
+  .t-wsudl  { --cls-color: #80ffcc; }
+  .t-wsuda  { --cls-color: #4ade80; }
+  .t-mon    { --cls-color: #ffd166; }
+  .t-water  { --cls-color: #74b3ce; }
+  .t-dam    { --cls-color: #a8dadc; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="header-badge">LCC Asset Data Model</div>
+    <h1>StormWater <span>Data Schema</span></h1>
+    <p>ADAC stormwater feature architecture — pits, pipes, culverts, WSUD, drainage and water bodies. Click cards to explore full attribute details.</p>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat-pill"><span class="stat-num">12</span><span class="stat-label">Feature Classes</span></div>
+    <div class="stat-pill"><span class="stat-num">18</span><span class="stat-label">Sub-features</span></div>
+    <div class="stat-pill"><span class="stat-num">150+</span><span class="stat-label">Attributes</span></div>
+    <div class="stat-pill"><span class="stat-num">300+</span><span class="stat-label">Enum Values</span></div>
+    <div class="stat-pill"><span class="stat-num">5</span><span class="stat-label">Geometry Types</span></div>
+  </div>
+
+  <!-- Architecture Overview -->
+  <div class="arch-overview">
+    <div class="arch-title">▸ Schema Hierarchy</div>
+    <div class="arch-flow">
+      <div class="arch-tier">
+        <div class="arch-tier-label">Asset</div>
+        <div class="arch-tier-box arch-tier-root">StormWater</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Feature Class</div>
+        <div class="arch-tier-box">Pits</div>
+        <div class="arch-tier-box">EndStructures</div>
+        <div class="arch-tier-box">Fittings</div>
+        <div class="arch-tier-box">Culverts</div>
+        <div class="arch-tier-box">Pipes</div>
+        <div class="arch-tier-box">SurfaceDrains</div>
+        <div class="arch-tier-box">+ 6 more…</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Feature / Sub-type</div>
+        <div class="arch-tier-box">Pit</div>
+        <div class="arch-tier-box">EndStructure (Pt)</div>
+        <div class="arch-tier-box">EndStructure (Line)</div>
+        <div class="arch-tier-box">GPTComplex</div>
+        <div class="arch-tier-box">GPTSimple</div>
+        <div class="arch-tier-box">NonGPTSimple</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Attribute / Container</div>
+        <div class="arch-tier-box">PitNumber / Use</div>
+        <div class="arch-tier-box">ChamberSize</div>
+        <div class="arch-tier-box">Inlet / Lintel</div>
+        <div class="arch-tier-box">PipeStructure</div>
+        <div class="arch-tier-box">EndWall / WingWall</div>
+        <div class="arch-tier-box">Apron / Geometry</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Enumeration</div>
+        <div class="arch-tier-box" style="font-size:10px">Prefab / Insitu</div>
+        <div class="arch-tier-box" style="font-size:10px">RCP / PVC / HDPE</div>
+        <div class="arch-tier-box" style="font-size:10px">Circ / Box / Arch</div>
+        <div class="arch-tier-box" style="font-size:10px">GPT / WSUD types</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid -->
+  <div class="schema-grid">
+
+    <!-- 1. Pits -->
+    <div class="fc-card t-pit">
+      <div class="fc-header">
+        <div class="fc-icon">🕳️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">Pits</div>
+          <div class="fc-title">Maintenance Holes &amp; Pits</div>
+        </div>
+        <div class="fc-badge">Point</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Stormwater maintenance holes, kerb inlets and field inlets. Captures chamber construction, lid type, inlet grates and depth.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Identity &amp; Use</div>
+          <div class="feature-row"><span class="feature-name">PitNumber</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Use</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Maintenance Hole</span><span class="enum-tag">Kerb Inlet</span><span class="enum-tag">Field Inlet</span><span class="enum-tag">Roofwater IC</span><span class="enum-tag">Roofwater Outlet</span><span class="enum-tag">Pit (no access)</span>
+          </div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Chamber</div>
+          <div class="feature-row"><span class="feature-name">ChamberConstruct</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Prefabricated</span><span class="enum-tag">Insitu</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">ChamberSize</span><span class="feature-type">Container</span><span class="feature-mandatory">★ M</span></div>
+          <div class="sub-feature">
+            <div class="feature-row"><span class="feature-name">Rectangular</span><span class="feature-type">Length + Width mm</span></div>
+            <div class="feature-row"><span class="feature-name">Circular</span><span class="feature-type">Diameter mm</span></div>
+            <div class="feature-row"><span class="feature-name">Elongated</span><span class="feature-type">boolean</span></div>
+            <div class="feature-row"><span class="feature-name">Extended</span><span class="feature-type">Radius + Extension mm</span></div>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">LidType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Circ Cast Iron</span><span class="enum-tag">Circ Conc Infill</span><span class="enum-tag">Sqr Cast Iron</span><span class="enum-tag">Rect Cast Iron</span><span class="enum-tag">CI Frame</span><span class="enum-tag">Precast Slabs</span>
+          </div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Levels &amp; Dimensions</div>
+          <div class="feature-row"><span class="feature-name">SurfaceLevel_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">InvertLevel_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Length_mm</span><span class="feature-type">integer</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Depth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Area_m2</span><span class="feature-type">integer</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">Entry Config</span><span class="feature-type">Enum</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Sag</span><span class="enum-tag">Lip in line</span></div>
+        </div>
+
+        <div class="fc-toggle" onclick="toggleDetails(this)">▸ INLET, LINTEL &amp; OUTLET DETAILS</div>
+        <div class="fc-details">
+          <div class="scrollable">
+          <div class="feature-group">
+            <div class="feature-group-label">Inlet</div>
+            <div class="feature-row"><span class="feature-name">InletConfig</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Left</span><span class="enum-tag">Centre</span><span class="enum-tag">Right</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">InletType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap">
+              <span class="enum-tag">Galv Grate</span><span class="enum-tag">Cast Iron Grate</span><span class="enum-tag">Hydroflow</span><span class="enum-tag">Bike/Ped Safe</span><span class="enum-tag">Field Inlet Dome</span><span class="enum-tag">Surcharge Grate</span><span class="enum-tag">Flush Grate</span><span class="enum-tag">KIL Gully</span><span class="enum-tag">LIL Gully</span><span class="enum-tag">Anti-Ponding</span><span class="enum-tag">Bro-Pit</span><span class="enum-tag">Drainway</span><span class="enum-more">+6</span>
+            </div>
+            <div class="feature-row mt-4"><span class="feature-name">Grated Entry</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">600x600</span><span class="enum-tag">600x900</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">InletSize</span><span class="feature-type">String_32</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">BaseConstruction</span><span class="feature-type">Prefab/Insitu</span><span class="feature-mandatory">★ M</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">Lintel</div>
+            <div class="feature-row"><span class="feature-name">LintelConstruct</span><span class="feature-type">Prefab/Insitu</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">LintelLength_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">Outlet &amp; Other</div>
+            <div class="feature-row"><span class="feature-name">OutletType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Dry</span><span class="enum-tag">Surcharge</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">FireRetardant</span><span class="feature-type">boolean</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Rotation</span><span class="feature-type">Float_Dir</span><span class="feature-mandatory opt">○ N</span></div>
+          </div>
+          <div class="geom-chip">◆ geometry_point_singlepoint (Mandatory)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. EndStructures -->
+    <div class="fc-card t-end">
+      <div class="fc-header">
+        <div class="fc-icon">🔚</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">EndStructures</div>
+          <div class="fc-title">End Walls &amp; Headwalls</div>
+        </div>
+        <div class="fc-badge">Point / Polyline</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Pipe/culvert endstructures with end wall, wing walls and apron. Two sub-types: Point and Polyline geometry.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Identity</div>
+          <div class="feature-row"><span class="feature-name">StructureID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">StructureLevel_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">End Wall</div>
+          <div class="feature-row"><span class="feature-name">Type</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Pipe Endwall</span><span class="enum-tag">Box Endwall</span><span class="enum-tag">Multi Cell Pipe</span><span class="enum-tag">Multi Cell Box</span><span class="enum-tag">Sloping Pipe</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Size</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Length / Height / Thickness</span><span class="feature-type">Float+ (m)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Material</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Concrete</span><span class="enum-tag">RC</span><span class="enum-tag">Grouted Rock</span><span class="enum-tag">Revetment Mat</span><span class="enum-tag">N/A</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">Construction</span><span class="feature-type">Prefab/Insitu</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+
+        <div class="fc-toggle" onclick="toggleDetails(this)">▸ WING WALLS, APRON, GRATE &amp; TIDE GATE</div>
+        <div class="fc-details">
+          <div class="scrollable">
+          <div class="feature-group">
+            <div class="feature-group-label">Wing Walls (Left &amp; Right)</div>
+            <div class="feature-row"><span class="feature-name">LWW / RWW Length</span><span class="feature-type">Float+ (m)</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">LWW / RWW Height</span><span class="feature-type">Float+ (m)</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">LWW / RWW Thickness</span><span class="feature-type">Float+ (m)</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">LWW / RWW Material</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Concrete</span><span class="enum-tag">RC</span><span class="enum-tag">Grouted Rock</span><span class="enum-tag">Revetment Mat</span><span class="enum-tag">N/A</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">LWW / RWW Construct</span><span class="feature-type">Prefab/Insitu</span><span class="feature-mandatory">★ M</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">Apron</div>
+            <div class="feature-row"><span class="feature-name">Width / Length / Thickness</span><span class="feature-type">Float+ (m)</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Apron_Area_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Apron_Material</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap">
+              <span class="enum-tag">Grassed</span><span class="enum-tag">Concrete</span><span class="enum-tag">Stone Pitched</span><span class="enum-tag">Placed Rock</span><span class="enum-tag">Grouted Rock</span><span class="enum-tag">Revetment Mat</span><span class="enum-tag">Rock Wire Basket</span><span class="enum-tag">Geotextile</span><span class="enum-tag">Conc Dissipator</span>
+            </div>
+            <div class="feature-row mt-4"><span class="feature-name">Apron_Construction</span><span class="feature-type">Prefab/Insitu</span><span class="feature-mandatory">★ M</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">Grate &amp; Tide Gate</div>
+            <div class="feature-row"><span class="feature-name">GrateType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Baffled</span><span class="enum-tag">Grated</span><span class="enum-tag">Silting Basin</span><span class="enum-tag">None</span><span class="enum-tag">Fauna</span><span class="enum-tag">Other</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">TideGate</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Fibreglass</span><span class="enum-tag">Fabricated</span><span class="enum-tag">Controlled</span><span class="enum-tag">Rubber</span><span class="enum-tag">None</span></div>
+          </div>
+          <div class="geom-chip">◆ Point: geometry_point_singlepoint</div>
+          <div class="geom-chip" style="margin-top:4px">◆ Polyline: geometry_linear_singlepath_simple</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Fittings -->
+    <div class="fc-card t-fit">
+      <div class="fc-header">
+        <div class="fc-icon">🔧</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">Fittings</div>
+          <div class="fc-title">Point Fittings</div>
+        </div>
+        <div class="fc-badge">Point</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Small point fittings in the stormwater system — end caps, tide gates, frog flaps and duckbill valves.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Fitting</div>
+          <div class="feature-row"><span class="feature-name">FittingType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">End Cap</span><span class="enum-tag">Tide Gate</span><span class="enum-tag">Frog Flap</span><span class="enum-tag">Duckbill Valve</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Rotation</span><span class="feature-type">Float_Dir</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <!-- 4. Culverts -->
+    <div class="fc-card t-culv">
+      <div class="fc-header">
+        <div class="fc-icon">🌉</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">Culverts</div>
+          <div class="fc-title">Cross Road Culverts</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">LCC Specific: Cross-road culvert structures classified by use and TMR structure type (Major/Minor).</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Classification</div>
+          <div class="feature-row"><span class="feature-name">StructureID</span><span class="feature-type">String_32</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">CulvertUse</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Culvert</span><span class="enum-tag">Fish Passage</span><span class="enum-tag">Ped/Fauna Culvert</span><span class="enum-tag">Stormwater Network</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">StructureType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Major</span><span class="enum-tag">Minor</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_area_multipath_complex</div>
+      </div>
+    </div>
+
+    <!-- 5. Pipes -->
+    <div class="fc-card t-pipe">
+      <div class="fc-header">
+        <div class="fc-icon">⬛</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">Pipes</div>
+          <div class="fc-title">Stormwater Pipes</div>
+        </div>
+        <div class="fc-badge">Polyline</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Stormwater pipes and culvert structures. Three cross-section types: Circular, Arch (LCC) and Box. Full invert level, material, class and joint data.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Identity &amp; Use</div>
+          <div class="feature-row"><span class="feature-name">StructureID</span><span class="feature-type">String_32</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">CulvertUse</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Culvert</span><span class="enum-tag">Fish Passage</span><span class="enum-tag">Ped/Fauna</span><span class="enum-tag">SW Network</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">StructureType</span><span class="feature-type">Major/Minor</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Levels</div>
+          <div class="feature-row"><span class="feature-name">US_InvertLevel_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">DS_InvertLevel_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">US_SurfaceLevel_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">DS_SurfaceLevel_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+
+        <div class="fc-toggle" onclick="toggleDetails(this)">▸ PIPE STRUCTURE DETAILS (3 TYPES)</div>
+        <div class="fc-details">
+          <div class="scrollable">
+          <div class="subtype-grid">
+            <div class="subtype-panel">
+              <div class="subtype-label">CircPipe</div>
+              <div class="feature-row"><span class="feature-name">Diameter_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">Material</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+              <div class="enum-wrap"><span class="enum-tag">RCP</span><span class="enum-tag">FRC</span><span class="enum-tag">PVC-U</span><span class="enum-tag">HDPE</span><span class="enum-tag">PP</span><span class="enum-tag">RPP</span><span class="enum-tag">GRP</span><span class="enum-tag">CSP</span><span class="enum-tag">CAP</span><span class="enum-tag">SFRC</span></div>
+              <div class="feature-row mt-4"><span class="feature-name">Class</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+              <div class="enum-wrap"><span class="enum-tag">1</span><span class="enum-tag">2</span><span class="enum-tag">3</span><span class="enum-tag">4</span><span class="enum-tag">6</span><span class="enum-tag">8</span><span class="enum-tag">10</span><span class="enum-tag">SN2</span><span class="enum-tag">SN4</span><span class="enum-tag">SN8</span></div>
+              <div class="feature-row mt-4"><span class="feature-name">JointType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+              <div class="enum-wrap"><span class="enum-tag">FJ</span><span class="enum-tag">RRJ</span><span class="enum-tag">SWJ</span></div>
+            </div>
+            <div class="subtype-panel">
+              <div class="subtype-label">Arch (LCC)</div>
+              <div class="feature-row"><span class="feature-name">Height_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">Width_mm</span><span class="feature-type">posInt</span></div>
+              <div class="feature-row"><span class="feature-name">Material</span><span class="feature-type">Enum</span></div>
+              <div class="enum-wrap"><span class="enum-tag">RCP</span><span class="enum-tag">CSP</span></div>
+            </div>
+            <div class="subtype-panel">
+              <div class="subtype-label">BoxPipe</div>
+              <div class="feature-row"><span class="feature-name">Height_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">Width_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">Material</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+              <div class="enum-wrap"><span class="enum-tag">RCBC</span><span class="enum-tag">SLBC</span></div>
+              <div class="feature-row mt-4"><span class="feature-name">Class</span><span class="feature-type">1–SN8</span><span class="feature-mandatory">★ M</span></div>
+            </div>
+          </div>
+          <div class="feature-group" style="margin-top:10px">
+            <div class="feature-group-label">Pipe Parameters</div>
+            <div class="feature-row"><span class="feature-name">Cells</span><span class="feature-type">posInt (=1)</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">ConcreteCoverType</span><span class="feature-type">Standard/Saltwater</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Length_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Cover</span><span class="feature-type">float (soil depth)</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Grade</span><span class="feature-type">Float+ %</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">SkewAngle</span><span class="feature-type">posInt °</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">Capacity_ea</span><span class="feature-type">Float+ (×80%)</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">Capacity_m3</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          </div>
+          <div class="geom-chip">◆ geometry_linear_multipath_simple (flow direction)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. SurfaceDrains -->
+    <div class="fc-card t-drain">
+      <div class="fc-header">
+        <div class="fc-icon">〰️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">SurfaceDrains</div>
+          <div class="fc-title">Channels &amp; Open Drains</div>
+        </div>
+        <div class="fc-badge">Polyline</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Linear surface drains including natural waterways, overland flow paths, infiltration trenches and constructed channels.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Drain Classification</div>
+          <div class="feature-row"><span class="feature-name">Type</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Canal</span><span class="enum-tag">Open Drain</span><span class="enum-tag">Overland Flow</span><span class="enum-tag">Flat Surface</span><span class="enum-tag">Natural Waterway</span><span class="enum-tag">Infiltration Trench</span><span class="enum-tag">Diversion Drain</span><span class="enum-tag">Batter Chute</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">DrainShape</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Flat Bottom</span><span class="enum-tag">Vee Drain</span><span class="enum-tag">Swale</span><span class="enum-tag">Natural Channel</span><span class="enum-tag">Diversion Profile</span></div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Lining &amp; Batter</div>
+          <div class="feature-row"><span class="feature-name">LiningMaterial</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Grassed</span><span class="enum-tag">Earth</span><span class="enum-tag">Concrete</span><span class="enum-tag">Stone Pitched</span><span class="enum-tag">Placed Rock</span><span class="enum-tag">Grouted Rock</span><span class="enum-tag">Revetment Mat</span><span class="enum-tag">Natural</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">LinedWidth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">BatterMaterial</span><span class="feature-type">Enum (same)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">BatterWidth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">WettedPerimeter</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Dimensions &amp; Levels</div>
+          <div class="feature-row"><span class="feature-name">Width_base_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Width_top_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Height_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">US_InvertLevel_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">DS_InvertLevel_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Length_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">AverageGrade %</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_linear_singlepath_simple</div>
+      </div>
+    </div>
+
+    <!-- 7. WSUDPoints (span 2) -->
+    <div class="fc-card t-wsudp span2">
+      <div class="fc-header">
+        <div class="fc-icon">🌿</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">WSUDPoints</div>
+          <div class="fc-title">Water Sensitive Urban Design — Point Features (3 Sub-types)</div>
+        </div>
+        <div class="fc-badge">Point</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">WSUD / SQID devices. Three sub-types: GPTComplex (combined), GPTSimple (baskets/grates on existing infrastructure), NonGPTSimple (sand filters, infiltration, energy dissipation).</div>
+
+        <div class="subtype-grid">
+
+          <div class="subtype-panel">
+            <div class="subtype-label">GPTComplex (Combined SQID)</div>
+            <div class="feature-row"><span class="feature-name">Type</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">GPTSimple</span><span class="enum-tag">GPTComplex</span><span class="enum-tag">NonGPTSimple</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">Sqid_Id</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Construction</span><span class="feature-type">Prefab/Insitu/Comm/Custom</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Size (Rect/Circ)</span><span class="feature-type">L×W or Dia mm</span></div>
+            <div class="feature-row"><span class="feature-name">Function 1–3</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Gross Poll.</span><span class="enum-tag">Sediment</span><span class="enum-tag">Oil/Grit Sep</span><span class="enum-tag">Filtration</span><span class="enum-tag">Sand Filtration</span><span class="enum-tag">Energy Diss.</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">TreatmentMeasure</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Basket</span><span class="enum-tag">Biopod</span><span class="enum-tag">Net</span><span class="enum-tag">Filter Cart.</span><span class="enum-tag">V.Grate</span><span class="enum-tag">H.Grate</span><span class="enum-tag">Aquifer Tank</span><span class="enum-tag">Energy Diss.</span><span class="enum-tag">Infilt. Pond</span><span class="enum-tag">Sand Filter</span><span class="enum-tag">Sediment Pit</span><span class="enum-more">+3</span></div>
+          </div>
+
+          <div class="subtype-panel">
+            <div class="subtype-label">GPTSimple (Basket/Grate)</div>
+            <div class="feature-row"><span class="feature-name">Sqid_Id</span><span class="feature-type">String_32</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">Construction</span><span class="feature-type">Prefab/Insitu</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Manufacturer</span><span class="feature-type">String_64</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">ModelNumber</span><span class="feature-type">String_64</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">TreatmentMeasure</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Basket</span><span class="enum-tag">Net</span><span class="enum-tag">Vertical Grate</span><span class="enum-tag">Horizontal Grate</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">Length_mm / Width_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Material</span><span class="feature-type">String_64</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">MaintenanceCycle</span><span class="feature-type">posInt (mnths)</span><span class="feature-mandatory opt">○ N</span></div>
+          </div>
+
+          <div class="subtype-panel">
+            <div class="subtype-label">NonGPTSimple</div>
+            <div class="feature-row"><span class="feature-name">Construction</span><span class="feature-type">Prefab/Insitu</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">TreatmentMeasure</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Aquifer Tank</span><span class="enum-tag">Energy Diss.</span><span class="enum-tag">Floating Boom</span><span class="enum-tag">Infilt. Pond</span><span class="enum-tag">Infilt. Tank</span><span class="enum-tag">Rubble Pit</span><span class="enum-tag">Sand Filter</span><span class="enum-tag">Sed. Forebay</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">Function 1–3</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+            <div class="enum-wrap"><span class="enum-tag">Sediment</span><span class="enum-tag">Sand Filtration</span><span class="enum-tag">Infiltration</span><span class="enum-tag">Aquifer Storage</span><span class="enum-tag">Energy Diss.</span></div>
+            <div class="feature-row mt-4"><span class="feature-name">Length_mm / Width_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          </div>
+
+          <div class="subtype-panel">
+            <div class="subtype-label">GPTComplex — Levels &amp; Performance</div>
+            <div class="feature-row"><span class="feature-name">SurfaceLevel_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">US/DS InvertLevel</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">Cleanout Level</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">DesignFlow_m3s</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">MaxContamVol_m3</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">HasFilterMedia</span><span class="feature-type">boolean</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">HasBasket</span><span class="feature-type">boolean</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">HasBoards</span><span class="feature-type">boolean</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">SumpDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">MaxInternalVol</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">MaintenanceCycle</span><span class="feature-type">posInt (mnths)</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">US/DS PipeDia_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">Material</span><span class="feature-type">String_64</span><span class="feature-mandatory">★ M</span></div>
+          </div>
+
+        </div>
+        <div class="geom-chip" style="margin-top:10px">◆ geometry_point_singlepoint (all sub-types)</div>
+      </div>
+    </div>
+
+    <!-- 8. WSUD Polylines -->
+    <div class="fc-card t-wsudl">
+      <div class="fc-header">
+        <div class="fc-icon">🌊</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">WSUD Polylines</div>
+          <div class="fc-title">Flow Management Devices</div>
+        </div>
+        <div class="fc-badge">Polyline</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Linear WSUD / SQID features — levees, spillways and weirs that manage stormwater flow.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Device</div>
+          <div class="feature-row"><span class="feature-name">Sqid_Id</span><span class="feature-type">String_32</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">Type</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Levee</span><span class="enum-tag">Spillway</span><span class="enum-tag">Weir</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">Material</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Concrete</span><span class="enum-tag">Earth</span><span class="enum-tag">Grassed</span><span class="enum-tag">Grouted Rock</span><span class="enum-tag">Metal</span><span class="enum-tag">Placed Rock</span><span class="enum-tag">Timber</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">Length_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">CrestElevation_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_linear_multipath_simple</div>
+      </div>
+    </div>
+
+    <!-- 9. WSUDAreas -->
+    <div class="fc-card t-wsuda">
+      <div class="fc-header">
+        <div class="fc-icon">🏞️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">WSUDAreas</div>
+          <div class="fc-title">Wetlands, Basins &amp; Bioretention</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">WSUD area features — constructed wetlands, bioretention basins, swales and detention basins.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Treatment Measure</div>
+          <div class="feature-row"><span class="feature-name">TreatmentMeasure</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Bioretention Swale</span><span class="enum-tag">Sedimentation Basin</span><span class="enum-tag">Infiltration Basin</span><span class="enum-tag">Harvesting Pond</span><span class="enum-tag">Detention Basin</span><span class="enum-tag">Bioretention Basin</span><span class="enum-tag">Swale</span><span class="enum-tag">Buffer Strip</span><span class="enum-tag">Constructed Wetland</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Sqid_Id</span><span class="feature-type">String_32</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">Function 1–3</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M / ○ N</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Gross Poll.</span><span class="enum-tag">Sediment</span><span class="enum-tag">Oil/Grit</span><span class="enum-tag">Sand Filt.</span><span class="enum-tag">Permeation</span><span class="enum-tag">Veg. Filtration</span><span class="enum-tag">Bioretention</span><span class="enum-tag">Detention</span></div>
+        </div>
+
+        <div class="fc-toggle" onclick="toggleDetails(this)">▸ BASIN DIMENSIONS &amp; DESIGN PARAMETERS</div>
+        <div class="fc-details">
+          <div class="scrollable">
+          <div class="feature-group">
+            <div class="feature-group-label">Ponding &amp; Filter</div>
+            <div class="feature-row"><span class="feature-name">PondingArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">PondingDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">FilterArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">FilterDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">TransitionDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">DrainageDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">Wetland / Macrophyte Zone</div>
+            <div class="feature-row"><span class="feature-name">MacrophyteArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">MacrophyteDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">CoarseSedArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+            <div class="feature-row"><span class="feature-name">SedimentVol_m3</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          </div>
+          <div class="feature-group">
+            <div class="feature-group-label">Levels &amp; Performance</div>
+            <div class="feature-row"><span class="feature-name">MinSurfaceLevel_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">PermanentPondLevel</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">OutletLevel_m</span><span class="feature-type">float</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">DesignFlow_m3s</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">HasSpillway</span><span class="feature-type">boolean</span><span class="feature-mandatory">★ M</span></div>
+            <div class="feature-row"><span class="feature-name">MaintenanceCycle</span><span class="feature-type">posInt (mnths)</span><span class="feature-mandatory opt">○ N</span></div>
+          </div>
+          <div class="geom-chip">◆ geometry_area_multipath_complex</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10. MonitoringStation -->
+    <div class="fc-card t-mon">
+      <div class="fc-header">
+        <div class="fc-icon">📡</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">MonitoringStation</div>
+          <div class="fc-title">Flood &amp; Rain Gauges</div>
+        </div>
+        <div class="fc-badge">Point</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">LCC Specific: Environmental monitoring stations for rainfall, river height, groundwater and road inundation.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Station</div>
+          <div class="feature-row"><span class="feature-name">Type</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">BOM Standard</span><span class="enum-tag">Environmental</span><span class="enum-tag">Road Inundation Float</span><span class="enum-tag">Ground Water</span><span class="enum-tag">Rainfall</span><span class="enum-tag">River Height</span><span class="enum-tag">Combination</span><span class="enum-tag">Other</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Telemetry</span><span class="feature-type">Boolean</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <!-- 11. WaterBody -->
+    <div class="fc-card t-water">
+      <div class="fc-header">
+        <div class="fc-icon">🏊</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">WaterBody</div>
+          <div class="fc-title">Lakes, Ponds &amp; Wetlands</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">LCC Specific: Water bodies classified by primary function — natural wetlands, naturalised ponds and constructed urban lakes. Distinct from WSUD detention basins.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Classification</div>
+          <div class="feature-row"><span class="feature-name">AssetType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Natural Wetland</span><span class="enum-tag">Naturalised Pond/Lake</span><span class="enum-tag">Constructed Urban Pond</span>
+          </div>
+        </div>
+        <div class="feature-group">
+          <div class="feature-group-label">Dimensions</div>
+          <div class="feature-row"><span class="feature-name">MaximumDepth_m</span><span class="feature-type">Float+</span></div>
+          <div class="feature-row"><span class="feature-name">Volume_m3</span><span class="feature-type">Float+</span></div>
+          <div class="feature-row"><span class="feature-name">HighWaterMarkArea</span><span class="feature-type">Float+ (sqm)</span></div>
+          <div class="feature-row"><span class="feature-name">WaterBodyArea_sqm</span><span class="feature-type">Float+</span></div>
+          <div class="feature-row"><span class="feature-name">ManagementPlan</span><span class="feature-type">String_32</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_area_multipath_complex</div>
+      </div>
+    </div>
+
+    <!-- 12. ReferableDam -->
+    <div class="fc-card t-dam">
+      <div class="fc-header">
+        <div class="fc-icon">🏗️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">ReferableDam</div>
+          <div class="fc-title">Referable Dams</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">LCC Specific: Dams that are not water bodies or WSUD detention features. May or may not contain water. Includes emergency action planning.</div>
+        <div class="feature-group">
+          <div class="feature-group-label">Dam Details</div>
+          <div class="feature-row"><span class="feature-name">MaximumDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Volume_m3</span><span class="feature-type">Float+</span></div>
+          <div class="feature-row"><span class="feature-name">HighWaterMarkArea</span><span class="feature-type">Float+ (sqm)</span></div>
+          <div class="feature-row"><span class="feature-name">WaterBodyArea_sqm</span><span class="feature-type">Float+</span></div>
+          <div class="feature-row"><span class="feature-name">EmergencyActionPlan</span><span class="feature-type">String_64</span></div>
+          <div class="feature-row"><span class="feature-name">WaterLevelControl</span><span class="feature-type">String (free)</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_area_multipath_complex</div>
+      </div>
+    </div>
+
+  </div><!-- end grid -->
+
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:var(--warn)"></span>★ M = Mandatory field</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--muted)"></span>○ N = Optional field</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--accent3)"></span>◆ = Geometry type</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--accent1)"></span>LCC = Council-specific attribute</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--accent2)"></span>▸ = Click to expand details</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#ffd166)"></span>SQID = Stormwater Quality Improvement Device</div>
+  </div>
+
+  <footer>
+    <span>StormWater</span> Asset Data Schema · LCC Spatial Data Model · ADAC Stormwater Feature Architecture
+  </footer>
+</div>
+
+<script>
+  function toggleDetails(btn) {
+    const details = btn.nextElementSibling;
+    const isOpen = details.classList.contains('open');
+    details.classList.toggle('open', !isOpen);
+    btn.textContent = isOpen
+      ? btn.textContent.replace('▾', '▸')
+      : btn.textContent.replace('▸', '▾');
+    btn.style.color = isOpen ? '' : 'var(--accent1)';
+  }
+</script>
+</body>
+</html>

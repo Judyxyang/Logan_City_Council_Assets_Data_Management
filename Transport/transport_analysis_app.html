@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LCC Transport Asset Analyser</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=Instrument+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --ink: #0b0f1a;
+  --ink2: #111827;
+  --ink3: #1a2235;
+  --ink4: #1e2d45;
+  --line: #243350;
+  --a1: #4fffb0;
+  --a2: #00b4d8;
+  --a3: #ff6b6b;
+  --a4: #ffd166;
+  --a5: #c77dff;
+  --a6: #ff9e5e;
+  --dim: #4a5568;
+  --fog: #94a3b8;
+  --txt: #e2e8f0;
+  --white: #ffffff;
+  --r: 8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--ink);
+  color: var(--txt);
+  font-family: 'Instrument Sans', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── GRID BACKGROUND ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(79,255,176,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,255,176,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+
+.app { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 0 24px 80px; }
+
+/* ── HEADER ── */
+.site-header {
+  padding: 32px 0 24px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  border-bottom: 1px solid var(--line); margin-bottom: 32px;
+}
+.logo-group { display: flex; flex-direction: column; gap: 4px; }
+.logo-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; letter-spacing: 4px; text-transform: uppercase;
+  color: var(--a1); opacity: 0.7;
+}
+.logo-title {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(22px, 3vw, 36px); font-weight: 800;
+  color: var(--white); line-height: 1;
+}
+.logo-title span { color: var(--a1); }
+.header-status {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: var(--dim); text-align: right; line-height: 1.8;
+}
+.status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--dim); margin-right: 5px; }
+.status-dot.live { background: var(--a1); box-shadow: 0 0 6px var(--a1); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* ── UPLOAD ZONE ── */
+.upload-section { margin-bottom: 32px; }
+.upload-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px; margin-bottom: 12px;
+}
+.upload-card {
+  background: var(--ink2);
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  padding: 14px 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  position: relative; overflow: hidden;
+}
+.upload-card:hover { border-color: var(--a1); background: rgba(79,255,176,0.04); }
+.upload-card.loaded { border-style: solid; border-color: var(--a1); background: rgba(79,255,176,0.06); }
+.upload-card.loaded .uc-icon { opacity: 1; }
+.uc-icon { font-size: 20px; margin-bottom: 6px; opacity: 0.4; transition: opacity .2s; }
+.uc-name { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--fog); letter-spacing: 1px; margin-bottom: 4px; }
+.uc-status { font-size: 10px; color: var(--dim); }
+.uc-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--a1); font-weight: 500; }
+input[type=file] { display: none; }
+.upload-card.loaded::after {
+  content: '✓'; position: absolute; top: 6px; right: 8px;
+  font-size: 10px; color: var(--a1);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.upload-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn-primary {
+  background: var(--a1); color: var(--ink); border: none;
+  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  padding: 10px 22px; border-radius: var(--r);
+  cursor: pointer; transition: all .2s;
+}
+.btn-primary:hover { background: #5fffbc; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+.btn-ghost {
+  background: transparent; color: var(--fog);
+  border: 1px solid var(--line);
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  padding: 10px 16px; border-radius: var(--r);
+  cursor: pointer; transition: all .2s; letter-spacing: 1px;
+}
+.btn-ghost:hover { border-color: var(--a1); color: var(--a1); }
+.upload-hint { font-size: 11px; color: var(--dim); font-family: 'JetBrains Mono', monospace; }
+
+/* ── PROGRESS BAR ── */
+.progress-wrap { display: none; margin: 12px 0; }
+.progress-bar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--a1), var(--a2)); width: 0%; transition: width .3s; border-radius: 2px; }
+.progress-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--dim); margin-top: 5px; }
+
+/* ── TABS ── */
+.tab-bar {
+  display: flex; gap: 2px; margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+.tab-btn {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 1px; text-transform: uppercase;
+  padding: 10px 16px; border: none; background: transparent;
+  color: var(--dim); cursor: pointer; border-bottom: 2px solid transparent;
+  margin-bottom: -1px; white-space: nowrap; transition: all .2s;
+}
+.tab-btn:hover { color: var(--txt); }
+.tab-btn.active { color: var(--a1); border-bottom-color: var(--a1); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  text-align: center; padding: 80px 20px;
+  background: var(--ink2); border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.3; }
+.empty-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--fog); margin-bottom: 8px; }
+.empty-sub { font-size: 13px; color: var(--dim); }
+
+/* ── KPI STRIP ── */
+.kpi-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 24px; }
+.kpi-card {
+  background: var(--ink2); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 14px 16px;
+  position: relative; overflow: hidden;
+}
+.kpi-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--kc, var(--a1));
+}
+.kpi-label { font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); margin-bottom: 8px; }
+.kpi-value { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; color: var(--kc, var(--a1)); line-height: 1; }
+.kpi-sub { font-size: 10px; color: var(--dim); margin-top: 4px; }
+
+/* ── SECTION TITLE ── */
+.section-title {
+  font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase; color: var(--a1);
+  margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+}
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+/* ── TABLE ── */
+.tbl-wrap { overflow-x: auto; border-radius: var(--r); border: 1px solid var(--line); margin-bottom: 24px; }
+.tbl-wrap::-webkit-scrollbar { height: 4px; } .tbl-wrap::-webkit-scrollbar-thumb { background: var(--line); }
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+thead tr { background: var(--ink3); }
+th {
+  padding: 10px 12px; text-align: left;
+  font-family: 'JetBrains Mono', monospace; font-size: 8px;
+  letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim);
+  white-space: nowrap; border-bottom: 1px solid var(--line);
+  cursor: pointer; user-select: none;
+}
+th:hover { color: var(--a1); }
+th.sort-asc::after { content: ' ↑'; color: var(--a1); }
+th.sort-desc::after { content: ' ↓'; color: var(--a1); }
+td { padding: 9px 12px; border-bottom: 1px solid rgba(30,45,69,0.5); white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(79,255,176,0.025); }
+
+/* ── SCORE BADGE ── */
+.score-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+}
+.score-pip { width: 30px; height: 4px; border-radius: 2px; }
+
+.badge {
+  display: inline-block; font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; padding: 2px 7px; border-radius: 3px; font-weight: 500;
+}
+.badge-urgent { background: rgba(255,107,107,0.15); color: var(--a3); border: 1px solid rgba(255,107,107,0.3); }
+.badge-high { background: rgba(255,158,94,0.15); color: var(--a6); border: 1px solid rgba(255,158,94,0.3); }
+.badge-medium { background: rgba(255,209,102,0.15); color: var(--a4); border: 1px solid rgba(255,209,102,0.3); }
+.badge-ok { background: rgba(79,255,176,0.1); color: var(--a1); border: 1px solid rgba(79,255,176,0.2); }
+.badge-pass { background: rgba(79,255,176,0.1); color: var(--a1); border: 1px solid rgba(79,255,176,0.2); }
+.badge-warn { background: rgba(255,209,102,0.15); color: var(--a4); border: 1px solid rgba(255,209,102,0.3); }
+.badge-fail { background: rgba(255,107,107,0.15); color: var(--a3); border: 1px solid rgba(255,107,107,0.3); }
+
+/* ── BARS ── */
+.mini-bar { display: flex; align-items: center; gap: 6px; }
+.bar-track { flex: 1; height: 5px; background: var(--line); border-radius: 3px; max-width: 80px; }
+.bar-fill { height: 100%; border-radius: 3px; }
+
+/* ── GRID LAYOUT FOR CHARTS ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+@media(max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+@media(max-width: 900px) { .three-col { grid-template-columns: 1fr; } }
+
+/* ── PANEL ── */
+.panel {
+  background: var(--ink2); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 20px; margin-bottom: 16px;
+}
+.panel-title {
+  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
+  color: var(--fog); margin-bottom: 14px; letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ── DONUT CHART ── */
+.donut-wrap { display: flex; align-items: center; gap: 20px; }
+.donut-svg { flex-shrink: 0; }
+.donut-legend { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+.donut-item { display: flex; align-items: center; gap: 7px; font-size: 11px; }
+.donut-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.donut-label { color: var(--fog); flex: 1; }
+.donut-val { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--txt); }
+
+/* ── SEARCH / FILTER BAR ── */
+.toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.search-input {
+  flex: 1; min-width: 180px; background: var(--ink3); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 8px 12px;
+  color: var(--txt); font-size: 12px; font-family: 'Instrument Sans', sans-serif;
+  outline: none;
+}
+.search-input:focus { border-color: var(--a1); }
+.filter-sel {
+  background: var(--ink3); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 8px 10px;
+  color: var(--txt); font-size: 11px;
+  font-family: 'JetBrains Mono', monospace; outline: none; cursor: pointer;
+}
+.filter-sel:focus { border-color: var(--a1); }
+.count-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--dim); }
+
+/* ── EXPORT ── */
+.export-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.btn-export {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  letter-spacing: 1px; text-transform: uppercase;
+  padding: 7px 14px; border-radius: var(--r);
+  border: 1px solid var(--line); background: transparent;
+  color: var(--dim); cursor: pointer; transition: all .2s;
+}
+.btn-export:hover { border-color: var(--a1); color: var(--a1); }
+
+/* ── SUMMARY ROW CARDS ── */
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 24px; }
+.summary-card {
+  background: var(--ink2); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.sc-icon { font-size: 22px; }
+.sc-body { flex: 1; }
+.sc-name { font-size: 11px; font-weight: 600; color: var(--fog); }
+.sc-stats { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--dim); margin-top: 2px; }
+.sc-score { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 999;
+  background: var(--ink3); border: 1px solid var(--a1);
+  border-radius: var(--r); padding: 12px 18px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--a1);
+  transform: translateY(80px); opacity: 0; transition: all .3s; pointer-events: none;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* ── HEATMAP ── */
+.heatmap { display: grid; gap: 3px; margin-top: 8px; }
+.hm-row { display: flex; gap: 3px; align-items: center; }
+.hm-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--dim); width: 100px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+.hm-cell { width: 22px; height: 22px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 7px; color: rgba(0,0,0,0.7); font-weight: 600; cursor: default; }
+
+/* ── SCROLLBAR GLOBAL ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+
+/* ── MAP ── */
+#asset-map { height:460px; border-radius:var(--r); border:1px solid var(--line); margin-bottom:16px; z-index:1; position:relative; }
+.map-legend { display:flex; gap:16px; flex-wrap:wrap; padding:10px 14px; background:var(--ink2); border:1px solid var(--line); border-radius:var(--r); margin-bottom:12px; }
+.legend-item { display:flex; align-items:center; gap:6px; font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--fog); }
+.legend-dot  { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+.legend-sq   { width:11px; height:11px; border-radius:2px; flex-shrink:0; }
+.legend-line { width:18px; height:3px;  border-radius:2px; flex-shrink:0; }
+/* ── SCENARIO BAR ── */
+.scenario-bar { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+.scen-btn { background:var(--ink3); border:1px solid var(--line); color:var(--fog); font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:1px; padding:8px 14px; border-radius:var(--r); cursor:pointer; transition:all .2s; }
+.scen-btn.active { border-color:var(--a1); color:var(--a1); background:rgba(79,255,176,.08); font-weight:700; }
+/* ── YEAR BARS ── */
+.yr-bar-wrap  { display:flex; align-items:center; gap:10px; margin-bottom:7px; }
+.yr-bar-label { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--fog); width:42px; flex-shrink:0; }
+.yr-bar-track { flex:1; height:20px; background:var(--ink3); border-radius:4px; overflow:hidden; max-width:540px; }
+.yr-bar-fill  { height:100%; border-radius:4px; transition:width .4s ease; }
+.yr-bar-meta  { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--dim); white-space:nowrap; min-width:170px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="logo-group">
+      <div class="logo-eyebrow">Logan City Council · ADAC</div>
+      <div class="logo-title">Transport Asset <span>Analyser</span></div>
+    </div>
+    <div class="header-status" id="header-status">
+      <span class="status-dot" id="status-dot"></span>AWAITING DATA<br>
+      <span style="font-size:9px;opacity:.5">Upload CSVs to begin analysis</span>
+    </div>
+  </header>
+
+  <!-- UPLOAD ZONE -->
+  <div class="upload-section">
+    <div class="upload-grid" id="upload-grid"></div>
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-label" id="progress-label">Loading…</div>
+    </div>
+    <div class="upload-actions">
+      <button class="btn-primary" id="analyse-btn" disabled onclick="runAnalysis()">▶ Run Analysis</button>
+      <button class="btn-ghost" onclick="loadDemo()">Load Demo Data</button>
+      <span class="upload-hint" id="upload-hint">0 / 8 files loaded</span>
+    </div>
+  </div>
+
+  <!-- TABS + PANELS -->
+  <div id="report-section" style="display:none">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab('summary',this)">📋 Summary</button>
+      <button class="tab-btn" onclick="showTab('renewal',this)">🔴 Renewal</button>
+      <button class="tab-btn" onclick="showTab('forecast',this)">📅 10-Yr Forecast</button>
+      <button class="tab-btn" onclick="showTab('funding',this)">💰 Funding Model</button>
+      <button class="tab-btn" onclick="showTab('quality',this)">⚠ Data Quality</button>
+      <button class="tab-btn" onclick="showTab('map',this)">🗺 Asset Map</button>
+      <button class="tab-btn" onclick="showTab('spatial',this)">📊 Spatial</button>
+      <button class="tab-btn" onclick="showTab('performance',this)">📈 Performance</button>
+      <button class="tab-btn" onclick="showTab('browse',this)">📂 Browse</button>
+    </div>
+    <div class="tab-panel active" id="tab-summary"></div>
+    <div class="tab-panel" id="tab-renewal"></div>
+    <div class="tab-panel" id="tab-forecast"></div>
+    <div class="tab-panel" id="tab-funding"></div>
+    <div class="tab-panel" id="tab-quality"></div>
+    <div class="tab-panel" id="tab-map"></div>
+    <div class="tab-panel" id="tab-spatial"></div>
+    <div class="tab-panel" id="tab-performance"></div>
+    <div class="tab-panel" id="tab-browse"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const FC_CONFIG = [
+  {key:'pavement', label:'Pavement Areas',      icon:'🛣️', color:'#38bdf8', file:'01_PavementAreas.csv',          scoreField:'ConditionScore', yearField:'YearConstructed', nameField:'Name',             geomType:'Polygon'},
+  {key:'pathway',  label:'Pathways & Cycleways', icon:'🚶', color:'#4fffb0', file:'02_Pathways.csv',               scoreField:'ConditionScore', yearField:'YearConstructed', nameField:'Name',             geomType:'Polyline'},
+  {key:'bridge',   label:'Bridges',              icon:'🌉', color:'#fb923c', file:'03_Bridges.csv',                scoreField:'ConditionScore', yearField:'YearConstructed', nameField:'Name',             geomType:'Polygon'},
+  {key:'signal',   label:'Traffic Signals',      icon:'🚦', color:'#f472b6', file:'04_TrafficSignals.csv',         scoreField:'ConditionScore', yearField:'YearInstalled',   nameField:'SiteIntersection', geomType:'Point'},
+  {key:'linemark', label:'Line Marking',         icon:'〰️', color:'#facc15', file:'05_LineMarking.csv',            scoreField:'ConditionScore', yearField:'YearInstalled',   nameField:'AssetID',          geomType:'Polyline'},
+  {key:'busstop',  label:'Bus Stop Infra',        icon:'🚌', color:'#a78bfa', file:'06_BusStopInfrastructure.csv', scoreField:'ConditionScore', yearField:'YearInstalled',   nameField:'Name',             geomType:'Point'},
+  {key:'parking',  label:'Parking Areas',        icon:'🅿️', color:'#2dd4bf', file:'07_ParkingAreas.csv',          scoreField:'ConditionScore', yearField:'YearConstructed', nameField:'Name',             geomType:'Polygon'},
+  {key:'barrier',  label:'Safety Barriers',      icon:'🛡️', color:'#f87171', file:'08_RoadSafetyBarriers.csv',    scoreField:'ConditionScore', yearField:'YearInstalled',   nameField:'Name',             geomType:'Polyline'},
+];
+// ADAC useful life (years) per asset class
+const USEFUL_LIFE = {pavement:25, pathway:30, bridge:80, signal:20, linemark:8, busstop:25, parking:30, barrier:20};
+// Unit replacement cost estimators (AUD)
+const REPL_COST = {
+  pavement: r=>(parseFloat(r.SegmentLength_m)||200)*(parseFloat(r.SurfaceNomWidth_m)||7)*85,
+  pathway:  r=>(parseFloat(r.Length_m)||100)*(parseFloat(r.Width_m)||2.5)*110,
+  bridge:   r=>(parseFloat(r.DeckLength_m)||30)*(parseFloat(r.NomWidth_m)||8)*11500,
+  signal:   r=>175000+(parseInt(r.NoOfPoles)||4)*7500,
+  linemark: r=>(parseFloat(r.Length_m)||50)*38+(parseFloat(r.Area_m2)||0)*55,
+  busstop:  r=>r.BusStopType==='Premium'?85000:r.BusStopType==='Intermediate'?42000:20000,
+  parking:  r=>(parseFloat(r.SurfaceArea_sqm)||500)*90,
+  barrier:  r=>(parseFloat(r.Length_m)||100)*320,
+};
+// Logan LGA bounding box for synthetic coordinates
+const LOGAN_LAT=[-27.78,-27.58], LOGAN_LNG=[152.98,153.22];
+let LOADED={}, YEAR=new Date().getFullYear(), _leafletMap=null, _activeScenario='moderate';
+const fmtAUD=n=>n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+(n/1e3).toFixed(0)+'K':'$'+Math.round(n);
+
+// ── UPLOAD SETUP ─────────────────────────────────────────────────────────────
+function buildUploadGrid() {
+  const grid = document.getElementById('upload-grid');
+  grid.innerHTML = FC_CONFIG.map(fc => `
+    <label class="upload-card" id="uc-${fc.key}" for="fi-${fc.key}" title="Upload ${fc.file}">
+      <input type="file" id="fi-${fc.key}" accept=".csv" onchange="handleFile('${fc.key}',this)">
+      <div class="uc-icon">${fc.icon}</div>
+      <div class="uc-name">${fc.label}</div>
+      <div class="uc-status" id="us-${fc.key}">Click to upload</div>
+    </label>
+  `).join('');
+}
+
+function handleFile(key, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const cfg = FC_CONFIG.find(f => f.key === key);
+  Papa.parse(file, {
+    header: true, skipEmptyLines: true,
+    complete: (res) => {
+      LOADED[key] = res.data;
+      document.getElementById(`uc-${key}`).classList.add('loaded');
+      document.getElementById(`us-${key}`).innerHTML = `<span class="uc-count">${res.data.length} rows</span>`;
+      updateUploadState();
+    }
+  });
+}
+
+function updateUploadState() {
+  const n = Object.keys(LOADED).length;
+  document.getElementById('upload-hint').textContent = `${n} / ${FC_CONFIG.length} files loaded`;
+  const btn = document.getElementById('analyse-btn');
+  btn.disabled = n === 0;
+  if (n === FC_CONFIG.length) {
+    document.getElementById('status-dot').classList.add('live');
+    document.getElementById('header-status').innerHTML =
+      '<span class="status-dot live"></span>ALL FILES LOADED<br><span style="font-size:9px;opacity:.5">Ready to analyse</span>';
+  }
+}
+
+// ── DEMO DATA LOADER ─────────────────────────────────────────────────────────
+async function loadDemo() {
+  showToast('Loading demo data…');
+  const files = [
+    '01_PavementAreas.csv','02_Pathways.csv','03_Bridges.csv',
+    '04_TrafficSignals.csv','05_LineMarking.csv','06_BusStopInfrastructure.csv',
+    '07_ParkingAreas.csv','08_RoadSafetyBarriers.csv'
+  ];
+  // Generate demo data directly
+  generateDemoData();
+  runAnalysis();
+}
+
+function generateDemoData() {
+  const suburbs = ['Logan Central','Woodridge','Slacks Creek','Kingston','Loganlea','Springwood','Daisy Hill','Marsden','Eagleby','Meadowbrook','Beenleigh','Berrinba','Cornubia','Carbrook','Greenbank','Browns Plains','Hillcrest','Park Ridge','Boronia Heights','Logan Reserve'];
+  const streets = ['Wembley Rd','Kingston Rd','Browns Plains Rd','Chambers Flat Rd','Loganlea Rd','Beaudesert Rd','Waterford-Tamborine Rd','Paradise Rd','Teviot Rd','Hyperdome Dr','Grand Plaza Dr','Springwood Rd','Daisy Hill Rd','Marsden Rd','Slacks Creek Dr','Eagleby Rd','Logan River Rd','Yellowwood Rd','Homestead Dr','Meadowbrook Dr'];
+  const rnd = (a,b,d=1) => +((Math.random()*(b-a)+a).toFixed(d));
+  const pick = (...a) => a[Math.floor(Math.random()*a.length)];
+  const yr = (a,b) => Math.floor(Math.random()*(b-a+1)+a);
+  const score = () => rnd(1,10);
+  const id = (p,n) => `${p}-${String(n).padStart(4,'0')}`;
+
+  const coord = ()=>({Latitude:+(LOGAN_LAT[0]+Math.random()*(LOGAN_LAT[1]-LOGAN_LAT[0])).toFixed(6), Longitude:+(LOGAN_LNG[0]+Math.random()*(LOGAN_LNG[1]-LOGAN_LNG[0])).toFixed(6)});
+  const rv = (k,r)=>Math.round(REPL_COST[k](r));
+
+  LOADED.pavement = Array.from({length:25},(_,i)=>{const r={
+    AssetID:id('PAV',i+1), Name:`${pick(...streets)} Seg ${i+1}`, Suburb:pick(...suburbs),
+    GeometryType:'Polygon',...coord(),
+    AssetType:pick('Sealed','Sealed','Unsealed'), RoadCategory:pick('LOC','RRS','PRV','STA'),
+    RoadClass:pick('Access','Sec. Collector','Pri. Collector','Arterial'),
+    Hierarchy:pick('1-Urban Access','2-Urban Collector','4-Arterial'), WayCode:pick('A-Two Way','B-Divided'),
+    FromStreet:pick(...streets), ToStreet:pick(...streets),
+    SegmentLength_m:rnd(80,900), SurfaceType:pick('AC','AC','2CBS','Concrete','PMB','SMA'),
+    SurfaceThickness_mm:pick(40,50,60,75,100), SurfaceNomWidth_m:rnd(5.5,14),
+    TrafficWidth_m:rnd(5,13), PavementType:pick('Flexible','Rigid'),
+    BaseLayerType:pick('GR21-GR90','AC','Concrete','NGRL'), BaseLayerDepth_mm:pick(100,150,200,250),
+    Stabilisation:pick('None','Lime','Cement'), CBR:pick(3,4,5,6,8,10),
+    EnvironmentID:pick('1-Dry Non-React','2-Dry React','3-Wet Non-React','4-Wet React'),
+    TerrainID:pick('1-Level','3-Rolling'), StereotypeID:pick('C-Single CW','D-Full Std','F-Local'),
+    YearConstructed:yr(1975,2023), LastReseal:yr(2010,2024), ConditionScore:score(),
+    UsefulLife:USEFUL_LIFE.pavement};r.ReplacementValue=rv('pavement',r);return r;});
+
+  const bridgeNames=['Logan River Bridge','Slacks Creek Overpass','Carbrook Wetlands Bridge','Beenleigh Rail Overpass','Eagleby Pedestrian Bridge','Browns Plains Creek Bridge','Chambers Flat Creek Crossing','Waterford Bridge','Berrinba Creek Bridge','Cornubia Pedestrian Link','Springwood Rail Underpass','Loganlea Road Bridge','Kingston Road Overpass','Crestmead Creek Bridge','Marsden Rail Bridge','Park Ridge Bridge','Daisy Hill Creek Bridge','Greenbank Road Bridge','Hillcrest Pedestrian Bridge','Carbrook Lake Bridge','Tanah Merah Crossing','Priestdale Creek Bridge','Rosia Rd Overpass','Boronia Heights Bridge','Homestead Creek Crossing'];
+  LOADED.bridge = Array.from({length:25},(_,i)=>{const r={
+    AssetID:id('BRG',i+1), BridgeID:`LCC-B${String(i+1).padStart(3,'0')}`,
+    Name:bridgeNames[i], Suburb:pick(...suburbs),
+    GeometryType:'Polygon',...coord(),
+    Use:pick('Road','Road','Ped/Cycle','Shared'), Type:pick('Beam','Slab','Box Girder','Arch'),
+    CrossingType:pick('AS5100-2017','Austroads','NASSRA'), DesignLoad:pick('SM1600','SM1600','T44','M1600'),
+    AADT:Math.floor(rnd(500,18000,0)), DeckMaterial:pick('RC','RC','Steel','PSC Precast'),
+    NomWidth_m:rnd(4,14), DeckLength_m:rnd(8,120),
+    ExpansionJoint:pick('Asphaltic Plug','Compression Seal','Open Joint'),
+    BearingType:pick('Elastomeric','Pot','Sliding','Steel Lam'), BearingQuantity:Math.floor(rnd(2,12,0)),
+    PierMaterial:pick('RC','In-situ RC','Steel','Masonry'), PierQuantity:Math.floor(rnd(0,6,0)),
+    Foundation:pick('Bored Piles','Driven Piles','Spread ftg'), ContainmentClass:pick('Regular','Regular','Medium','Low'),
+    YearConstructed:yr(1960,2022), LastInspection:yr(2018,2024), ConditionScore:score(),
+    UsefulLife:USEFUL_LIFE.bridge};r.ReplacementValue=rv('bridge',r);return r;});
+
+  const intersections=['Wembley Rd & Kingston Rd','Browns Plains Rd & Grand Plaza Dr','Beaudesert Rd & Hyperdome Dr','Loganlea Rd & Chambers Flat Rd','Springwood Rd & Daisy Hill Rd','Kingston Rd & Marsden Rd','Waterford-Tamborine Rd & Paradise Rd','Eagleby Rd & Logan River Rd','Meadowbrook Dr & Loganlea Rd','Greenbank Rd & Boronia Rd','Beaudesert Rd & Stoney Camp Rd','Cornubia Blvd & Carbrook Rd','Hillcrest Rd & Chambers Flat Rd','Browns Plains Rd & Yellowwood Rd','Slacks Creek Dr & Kingston Rd','Grand Plaza Dr & Hyperdome Dr','Teviot Rd & Greenbank Rd','Berrinba Rd & Yellowwood Rd','Parklands Blvd & Meadowbrook Dr','Rosia Rd & Loganlea Rd','Homestead Dr & Chambers Flat Rd','Daisy Hill Rd & Cornubia Blvd','Marsden Rd & Berrinba Rd','Priestdale Rd & Browns Plains Rd','Tanah Merah Ferry Rd & Logan River Rd'];
+  LOADED.signal = Array.from({length:25},(_,i)=>{const r={
+    AssetID:id('SIG',i+1), Signal_ID:`QLD-${1200+i+1}`, Controller_ID:`CTRL-${300+i+1}`,
+    SiteIntersection:intersections[i], Suburb:pick(...suburbs),
+    GeometryType:'Point',...coord(),
+    SignalType:pick('4 Way','4 Way','3 Way','Pedestrian'), ControllerType:pick('Tyco','ATC'),
+    SystemSoftware:pick('TRAFF','QTRAFF'), NoOfPoles:Math.floor(rnd(2,8,0)),
+    NoOfLoops:Math.floor(rnd(4,16,0)), NoOfLanterns:Math.floor(rnd(6,20,0)),
+    YearInstalled:yr(1990,2023), LastMaintenance:yr(2020,2024), ConditionScore:score(),
+    UsefulLife:USEFUL_LIFE.signal};r.ReplacementValue=rv('signal',r);return r;});
+
+  LOADED.pathway = Array.from({length:25},(_,i)=>{const r={
+    AssetID:id('PATH',i+1), Name:`${pick(...streets)} Pathway ${i+1}`, Suburb:pick(...suburbs),
+    GeometryType:'Polyline',...coord(),
+    Use:pick('Pedestrian','Pedestrian','Shared','CycleWay','Ramp'),
+    SurfaceMaterial:pick('Concrete','Concrete','BPAV','Bitumen'),
+    Length_m:rnd(30,600), Width_m:rnd(1.2,4), Depth_mm:pick(75,100,125,150),
+    Grade_deg:rnd(0,8,2), DDACompliant:pick('Yes','Yes','No','Partial'), Tactiles:pick('Yes','Yes','No'),
+    YearConstructed:yr(1985,2024), ConditionScore:score(),
+    UsefulLife:USEFUL_LIFE.pathway};r.ReplacementValue=rv('pathway',r);return r;});
+
+  LOADED.linemark = Array.from({length:25},(_,i)=>{const r={
+    AssetID:id('LMK',i+1), Suburb:pick(...suburbs),
+    GeometryType:'Polyline',...coord(),
+    Category:pick('Linear','Linear','Area','Symbol'),
+    MarkingType:pick('Centre Line','Stop Line','Ped X-walk','Chevron','Speed Humps','Pavement Arrows'),
+    Material:pick('HAP','CAP','MMA','Water Based'), Colour:pick('White','White','Yellow','Red','Green'),
+    Length_m:Math.random()<0.6?rnd(5,200):'', Area_m2:Math.random()>0.6?rnd(4,120):'',
+    YearInstalled:yr(2005,2024), ConditionScore:score(),
+    UsefulLife:USEFUL_LIFE.linemark};r.ReplacementValue=rv('linemark',r);return r;});
+
+  const parkingNames=['Grand Plaza Shopping Centre','Hyperdome Car Park','Logan Hospital Car Park','Woodridge Train Station P&R','Beenleigh Train Station P&R','Kingston Shops','Logan Central Plaza','Springwood Mall','Daisy Hill Conservation Park','Loganlea TAFE','Meadowbrook Medical Centre','Browns Plains Shopping Centre','Greenbank RSL','Slacks Creek Industrial','Marsden Park','Eagleby Community Centre','Berrinba Wetlands','Cornubia Park','Hillcrest Community Hall','Carbrook Lake Reserve','Park Ridge Town Centre','Boronia Heights Oval','Greenbank Sports Complex','Chambers Flat Recreation Area','Logan Metro Sports Centre'];
+  LOADED.parking = Array.from({length:25},(_,i)=>{const r={
+    AssetID:id('PKG',i+1), Name:parkingNames[i], Suburb:pick(...suburbs),
+    GeometryType:'Polygon',...coord(),
+    OnOffStreet:pick('Off Street','Off Street','On Street'),
+    ParkingType:pick('Bay','Bay','Angle','Open Area','Parallel'),
+    NoOfCarparks:Math.floor(rnd(10,450,0)), DDACompliantBays:Math.floor(rnd(1,12,0)),
+    ChargingBays:pick(0,0,0,2,4,6), FrequencyUse:pick('High','High','Medium','Low'),
+    SurfaceType:pick('AC','AC','Concrete','CPAV'), SurfaceArea_sqm:rnd(200,8000),
+    YearConstructed:yr(1980,2022), ConditionScore:score(),
+    UsefulLife:USEFUL_LIFE.parking};r.ReplacementValue=rv('parking',r);return r;});
+
+  LOADED.busstop = Array.from({length:25},(_,i)=>{const r={
+    AssetID:id('BST',i+1), StopID:`LCC-BS${String(i+1).padStart(3,'0')}`,
+    Name:`${pick(...streets)} Stop ${i+1}`, Suburb:pick(...suburbs),
+    GeometryType:'Point',...coord(),
+    BusStopType:pick('Regular stop','Regular stop','Intermediate','Minimum boarding','Premium'),
+    BusStopFurniture:pick('Std Shelter','Seat (no ad)','Seat (ad)','Illum Ad','Non-standard'),
+    Terrain:pick('Active Lane','Stopping Lane','Sealed BS'),
+    MarkerType:pick('Flag Pole','Blade Sign','Regional J Pole','Virtual Stop'),
+    HardstandArea_m2:rnd(4,40), DDACompliant:pick('Yes','Yes','No','Partial'),
+    YearInstalled:yr(1990,2024), ConditionScore:score(),
+    UsefulLife:USEFUL_LIFE.busstop};r.ReplacementValue=rv('busstop',r);return r;});
+
+  LOADED.barrier = Array.from({length:25},(_,i)=>{const r={
+    AssetID:id('RSB',i+1), Name:`${pick(...streets)} Barrier ${i+1}`, Suburb:pick(...suburbs),
+    GeometryType:'Polyline',...coord(),
+    Type:pick('Flexible','Flexible','Semi-rigid','Rigid','Energy-abs Bollard'),
+    RailType:pick('Steel','Steel','Timber','Concrete'), PostType:pick('Steel','Steel','Timber'),
+    LeadingEnd:pick('ET2000 Plus','FLEAT','Bull Nose','MELT'), TrailingEnd:pick('Fishtail','MELT','Bull Nose','NEAT'),
+    Length_m:rnd(10,400), Height_m:pick(0.6,0.7,0.81,1.0,1.2), H_Alignment:pick('Straight','Curved','Both'),
+    YearInstalled:yr(1995,2023), LastInspection:yr(2019,2024), ConditionScore:score(),
+    UsefulLife:USEFUL_LIFE.barrier};r.ReplacementValue=rv('barrier',r);return r;});
+
+  FC_CONFIG.forEach(fc => {
+    if (LOADED[fc.key]) {
+      document.getElementById(`uc-${fc.key}`).classList.add('loaded');
+      document.getElementById(`us-${fc.key}`).innerHTML = `<span class="uc-count">${LOADED[fc.key].length} rows</span>`;
+    }
+  });
+  updateUploadState();
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+const scoreColor = s => { const n=parseFloat(s); return isNaN(n)?'#4a5568': n>=7?'#4fffb0': n>=4?'#facc15':'#f87171'; };
+const priorityBadge = p => `<span class="badge badge-${p.toLowerCase()}">${p}</span>`;
+const scoreBadge = s => {
+  const n=parseFloat(s)||0; const c=scoreColor(s); const pct=(n/10)*100;
+  return `<span class="score-badge"><div class="score-pip" style="background:${c};width:${pct*.4}px;min-width:4px;max-width:40px"></div><span style="color:${c}">${n}</span></span>`;
+};
+const avg = arr => arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length) : 0;
+const getScore = row => parseFloat(row.ConditionScore) || 0;
+
+function getAll() {
+  return FC_CONFIG.flatMap(fc => (LOADED[fc.key]||[]).map(r=>({...r,_fc:fc.key,_label:fc.label,_icon:fc.icon,_color:fc.color})));
+}
+
+// ── RUN ANALYSIS ─────────────────────────────────────────────────────────────
+function runAnalysis() {
+  const pw = document.getElementById('progress-wrap');
+  const pf = document.getElementById('progress-fill');
+  const pl = document.getElementById('progress-label');
+  pw.style.display='block';
+  const steps = ['Building summary…','Analysing conditions…','10-yr forecast & funding…','Auditing data quality…','Rendering asset map…','Computing spatial metrics…','Performance report…','Browse view…'];
+  let i=0;
+  const interval = setInterval(()=>{
+    i++; pf.style.width=(i/steps.length*100)+'%';
+    pl.textContent = steps[i-1]||'Done';
+    if(i>=steps.length){ clearInterval(interval);
+      setTimeout(()=>{
+        pw.style.display='none';
+        buildAllTabs();
+        document.getElementById('report-section').style.display='block';
+        document.getElementById('analyse-btn').textContent='↺ Re-run Analysis';
+        document.getElementById('status-dot').classList.add('live');
+        document.getElementById('header-status').innerHTML=
+          `<span class="status-dot live"></span>ANALYSIS LIVE<br><span style="font-size:9px;opacity:.5">Updated ${new Date().toLocaleTimeString()}</span>`;
+        showToast('Analysis complete ✓');
+        window.scrollTo({top:document.getElementById('report-section').offsetTop-20,behavior:'smooth'});
+      },300);
+    }
+  },180);
+}
+
+function buildAllTabs() {
+  buildSummary(); buildRenewal(); buildForecast(); buildFunding(); buildQuality(); buildSpatial(); buildPerformance(); buildBrowse();
+  // Map built on demand
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 1 — SUMMARY
+// ══════════════════════════════════════════════════════════════════════════════
+function buildSummary() {
+  const all = getAll();
+  const totalRecords = all.length;
+  const allScores = all.map(getScore).filter(s=>s>0);
+  const critical = allScores.filter(s=>s<4).length;
+  const goodPct = allScores.length ? Math.round(allScores.filter(s=>s>=7).length/allScores.length*100) : 0;
+  const avgAll = avg(allScores).toFixed(1);
+
+  // KPI strip
+  const kpis = [
+    {label:'Total Records', value:totalRecords, sub:'across all classes', color:'#38bdf8'},
+    {label:'Network Avg Score', value:avgAll+'/10', sub:'all asset types', color:scoreColor(avgAll)},
+    {label:'Critical Assets', value:critical, sub:'score < 4.0', color:'#f87171'},
+    {label:'Good Condition', value:goodPct+'%', sub:'score ≥ 7.0', color:'#4fffb0'},
+    {label:'Feature Classes', value:Object.keys(LOADED).length, sub:'loaded & analysed', color:'#a78bfa'},
+  ];
+
+  const loaded = LOADED.busstop;
+  if(loaded) {
+    const ddaOk = loaded.filter(r=>r.DDACompliant==='Yes').length;
+    kpis.push({label:'DDA Bus Stops', value:Math.round(ddaOk/loaded.length*100)+'%', sub:'fully compliant', color:'#2dd4bf'});
+  }
+  const brg = LOADED.bridge;
+  if(brg) {
+    const old = brg.filter(r=>(YEAR-parseInt(r.YearConstructed))>40).length;
+    kpis.push({label:'Bridges >40yr', value:old, sub:'age risk flagged', color:'#fb923c'});
+  }
+  const pkg = LOADED.parking;
+  if(pkg) {
+    const ev = pkg.reduce((a,r)=>a+(parseInt(r.ChargingBays)||0),0);
+    kpis.push({label:'EV Charge Bays', value:ev, sub:'total across network', color:'#4fffb0'});
+  }
+
+  let html = `<div class="kpi-strip">${kpis.map(k=>`
+    <div class="kpi-card" style="--kc:${k.color}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`).join('')}</div>`;
+
+  // Per-feature summary cards
+  html += `<div class="section-title">Feature Class Overview</div>
+  <div class="summary-grid">`;
+  FC_CONFIG.forEach(fc=>{
+    const rows = LOADED[fc.key]||[];
+    if(!rows.length) return;
+    const scores = rows.map(getScore).filter(s=>s>0);
+    const a = avg(scores).toFixed(1);
+    const crit = scores.filter(s=>s<4).length;
+    html += `<div class="summary-card">
+      <div class="sc-icon">${fc.icon}</div>
+      <div class="sc-body">
+        <div class="sc-name">${fc.label}</div>
+        <div class="sc-stats">${rows.length} records · ${crit} critical</div>
+      </div>
+      <div class="sc-score" style="color:${scoreColor(a)}">${a}</div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Condition distribution heatmap
+  html += `<div class="section-title">Condition Score Heatmap</div>
+  <div class="panel"><div class="heatmap" id="heatmap-grid"></div></div>`;
+
+  document.getElementById('tab-summary').innerHTML = html;
+
+  // Build heatmap
+  const hg = document.getElementById('heatmap-grid');
+  const bands = [[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10]];
+  // header row
+  let hdr = `<div class="hm-row"><div class="hm-label" style="font-size:8px;color:var(--a1)">Feature Class</div>`;
+  bands.forEach(([lo,hi])=>hdr+=`<div class="hm-cell" style="background:transparent;color:var(--dim);font-size:8px">${lo}-${hi}</div>`);
+  hdr+=`</div>`; hg.innerHTML=hdr;
+
+  FC_CONFIG.forEach(fc=>{
+    const rows=(LOADED[fc.key]||[]);
+    if(!rows.length) return;
+    const scores=rows.map(getScore).filter(s=>s>0);
+    let row=`<div class="hm-row"><div class="hm-label">${fc.icon} ${fc.label}</div>`;
+    bands.forEach(([lo,hi])=>{
+      const cnt=scores.filter(s=>s>=lo&&s<hi).length;
+      const intensity=cnt/rows.length;
+      const bg=cnt===0?'#111827':`rgba(${lo<4?'255,107,107':lo<7?'255,209,102':'79,255,176'},${0.1+intensity*0.7})`;
+      row+=`<div class="hm-cell" style="background:${bg}">${cnt||''}</div>`;
+    });
+    row+=`</div>`; hg.innerHTML+=row;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 2 — RENEWAL
+// ══════════════════════════════════════════════════════════════════════════════
+function buildRenewal() {
+  let html = '';
+  const renewalAssets = [];
+
+  FC_CONFIG.forEach(fc=>{
+    const rows = LOADED[fc.key]||[];
+    rows.forEach(r=>{
+      const s=getScore(r); if(s<=0) return;
+      const yr_c = parseInt(r[fc.yearField])||YEAR;
+      const age = YEAR-yr_c;
+      const resealGap = r.LastReseal ? YEAR-parseInt(r.LastReseal) : null;
+      let priority = s<4?'URGENT': s<5.5&&age>15?'HIGH': s<7?'MEDIUM':'OK';
+      if(priority==='OK') return;
+      renewalAssets.push({
+        AssetID: r.AssetID||r.BridgeID||'—',
+        Name: r[fc.nameField]||r.AssetID||'—',
+        FeatureClass: fc.label, Icon: fc.icon, Color: fc.color,
+        Suburb: r.Suburb||'—',
+        Score: s, Age: age,
+        ResealGap: resealGap,
+        Priority: priority,
+        _extraInfo: fc.key==='pavement'?r.RoadClass: fc.key==='bridge'?r.DesignLoad: fc.key==='signal'?r.SignalType: '',
+      });
+    });
+  });
+
+  renewalAssets.sort((a,b)=>a.Score-b.Score);
+
+  const urgent=renewalAssets.filter(r=>r.Priority==='URGENT').length;
+  const high=renewalAssets.filter(r=>r.Priority==='HIGH').length;
+  const medium=renewalAssets.filter(r=>r.Priority==='MEDIUM').length;
+
+  html += `<div class="kpi-strip">
+    <div class="kpi-card" style="--kc:#f87171"><div class="kpi-label">Urgent</div><div class="kpi-value">${urgent}</div><div class="kpi-sub">score < 4.0</div></div>
+    <div class="kpi-card" style="--kc:#fb923c"><div class="kpi-label">High Priority</div><div class="kpi-value">${high}</div><div class="kpi-sub">score < 5.5 + age</div></div>
+    <div class="kpi-card" style="--kc:#facc15"><div class="kpi-label">Medium</div><div class="kpi-value">${medium}</div><div class="kpi-sub">score < 7.0</div></div>
+    <div class="kpi-card" style="--kc:#4fffb0"><div class="kpi-label">Total Flagged</div><div class="kpi-value">${renewalAssets.length}</div><div class="kpi-sub">require attention</div></div>
+  </div>`;
+
+  html += `<div class="section-title">Renewal Priority List</div>
+  <div class="toolbar">
+    <input class="search-input" placeholder="Search asset name, suburb…" oninput="filterTable('renewal-tbl',this.value)">
+    <select class="filter-sel" onchange="filterTableByCol('renewal-tbl','Priority',this.value)">
+      <option value="">All Priorities</option>
+      <option>URGENT</option><option>HIGH</option><option>MEDIUM</option>
+    </select>
+    <span class="count-label" id="renewal-count">${renewalAssets.length} assets</span>
+  </div>
+  <div class="tbl-wrap">
+  <table id="renewal-tbl">
+  <thead><tr>
+    <th>#</th><th onclick="sortTable('renewal-tbl',1)">Asset ID</th>
+    <th onclick="sortTable('renewal-tbl',2)">Name</th>
+    <th onclick="sortTable('renewal-tbl',3)">Feature Class</th>
+    <th onclick="sortTable('renewal-tbl',4)">Suburb</th>
+    <th onclick="sortTable('renewal-tbl',5)">Score</th>
+    <th onclick="sortTable('renewal-tbl',6)">Age (yr)</th>
+    <th>Extra Info</th>
+    <th onclick="sortTable('renewal-tbl',8)">Priority</th>
+  </tr></thead>
+  <tbody>`;
+
+  renewalAssets.forEach((a,i)=>{
+    html+=`<tr>
+      <td style="color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:9px">${i+1}</td>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${a.Color}">${a.AssetID}</span></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${a.Name}</td>
+      <td>${a.Icon} ${a.FeatureClass}</td>
+      <td>${a.Suburb}</td>
+      <td>${scoreBadge(a.Score)}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${a.Age}</td>
+      <td style="font-size:10px;color:var(--dim)">${a._extraInfo||'—'}</td>
+      <td>${priorityBadge(a.Priority)}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>
+  <div class="export-row">
+    <button class="btn-export" onclick="exportTableCSV('renewal-tbl','renewal_priority.csv')">⬇ Export CSV</button>
+  </div>`;
+
+  document.getElementById('tab-renewal').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 3 — DATA QUALITY
+// ══════════════════════════════════════════════════════════════════════════════
+function buildQuality() {
+  let html = '';
+  const issues = [];
+  let totalIssues = 0;
+
+  const qualityChecks = FC_CONFIG.map(fc=>{
+    const rows = LOADED[fc.key]||[];
+    if(!rows.length) return null;
+    let missing=0, logical=0, outliers=0;
+
+    rows.forEach(r=>{
+      if(!r.AssetID||r.AssetID==='') missing++;
+      const sc=parseFloat(r.ConditionScore);
+      if(isNaN(sc)||sc<0||sc>10) { outliers++; issues.push({fc:fc.label,id:r.AssetID||'?',field:'ConditionScore',type:'Out of Range',val:r.ConditionScore,action:'Score must be 0–10. Verify source data.',sev:'HIGH'}); }
+      const yr_c=parseInt(r[fc.yearField]);
+      if(yr_c&&yr_c>YEAR) { logical++; issues.push({fc:fc.label,id:r.AssetID||'?',field:fc.yearField,type:'Future Date',val:yr_c,action:`${fc.yearField} is in the future — verify data entry.`,sev:'HIGH'}); }
+      if(r.LastReseal&&parseInt(r.LastReseal)>YEAR) { logical++; issues.push({fc:fc.label,id:r.AssetID||'?',field:'LastReseal',type:'Future Date',val:r.LastReseal,action:'LastReseal date is in the future.',sev:'MEDIUM'}); }
+      if(r.LastInspection&&r.YearConstructed&&parseInt(r.LastInspection)<parseInt(r.YearConstructed)) { logical++; issues.push({fc:fc.label,id:r.AssetID||'?',field:'LastInspection',type:'Logical Error',val:r.LastInspection,action:'Inspection predates construction — verify.',sev:'HIGH'}); }
+      if(fc.key==='pavement'&&parseFloat(r.SegmentLength_m)>2000) { outliers++; issues.push({fc:fc.label,id:r.AssetID||'?',field:'SegmentLength_m',type:'Outlier',val:r.SegmentLength_m,action:'Length >2000m — consider splitting segment.',sev:'LOW'}); }
+      if(fc.key==='bridge'&&r.DesignLoad==='T44') issues.push({fc:fc.label,id:r.AssetID||'?',field:'DesignLoad',type:'Legacy Standard',val:'T44',action:'T44 superseded by SM1600 — review for upgrade.',sev:'MEDIUM'});
+      if(fc.key==='pathway'&&r.DDACompliant==='No'&&['Pedestrian','Shared'].includes(r.Use)) issues.push({fc:fc.label,id:r.AssetID||'?',field:'DDACompliant',type:'Compliance Gap',val:'No',action:'Pedestrian path not DDA compliant — schedule assessment.',sev:'MEDIUM'});
+    });
+
+    const total=missing+logical+outliers;
+    totalIssues+=total;
+    return {name:fc.label, icon:fc.icon, color:fc.color, records:rows.length, missing, logical, outliers, total};
+  }).filter(Boolean);
+
+  const passed = qualityChecks.filter(q=>q.total===0).length;
+
+  html += `<div class="kpi-strip">
+    <div class="kpi-card" style="--kc:#4fffb0"><div class="kpi-label">Classes Passed</div><div class="kpi-value">${passed}/${qualityChecks.length}</div><div class="kpi-sub">zero issues found</div></div>
+    <div class="kpi-card" style="--kc:#f87171"><div class="kpi-label">Total Issues</div><div class="kpi-value">${totalIssues}</div><div class="kpi-sub">across all classes</div></div>
+    <div class="kpi-card" style="--kc:#facc15"><div class="kpi-label">High Severity</div><div class="kpi-value">${issues.filter(i=>i.sev==='HIGH').length}</div><div class="kpi-sub">require immediate review</div></div>
+    <div class="kpi-card" style="--kc:#a78bfa"><div class="kpi-label">Unique Issue Types</div><div class="kpi-value">${[...new Set(issues.map(i=>i.type))].length}</div><div class="kpi-sub">categories detected</div></div>
+  </div>`;
+
+  // Quality summary table
+  html += `<div class="section-title">Quality Check by Feature Class</div>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Feature Class</th><th>Records</th><th>Missing Fields</th><th>Logical Errors</th><th>Outliers</th><th>Total Issues</th><th>Status</th></tr></thead>
+  <tbody>`;
+  qualityChecks.forEach(q=>{
+    const status = q.total===0?'<span class="badge badge-pass">PASS ✓</span>':
+      q.total>3?`<span class="badge badge-fail">ISSUES: ${q.total}</span>`:
+      `<span class="badge badge-warn">WARN: ${q.total}</span>`;
+    html+=`<tr>
+      <td><span style="color:${q.color}">${q.icon} ${q.name}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace">${q.records}</td>
+      <td style="color:${q.missing>0?'#f87171':'#4a5568'};font-family:'JetBrains Mono',monospace">${q.missing||'—'}</td>
+      <td style="color:${q.logical>0?'#f87171':'#4a5568'};font-family:'JetBrains Mono',monospace">${q.logical||'—'}</td>
+      <td style="color:${q.outliers>0?'#facc15':'#4a5568'};font-family:'JetBrains Mono',monospace">${q.outliers||'—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-weight:600;color:${q.total>0?'#facc15':'#4fffb0'}">${q.total||'0'}</td>
+      <td>${status}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>`;
+
+  // Issues log
+  if(issues.length) {
+    html += `<div class="section-title">Issues Log</div>
+    <div class="toolbar">
+      <input class="search-input" placeholder="Search issues…" oninput="filterTable('quality-tbl',this.value)">
+      <select class="filter-sel" onchange="filterTableByCol('quality-tbl','Severity',this.value)">
+        <option value="">All Severities</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+      </select>
+      <span class="count-label">${issues.length} issues</span>
+    </div>
+    <div class="tbl-wrap"><table id="quality-tbl">
+    <thead><tr><th>#</th><th>Feature Class</th><th>Asset ID</th><th>Field</th><th>Issue Type</th><th>Current Value</th><th>Recommended Action</th><th>Severity</th></tr></thead>
+    <tbody>`;
+    issues.forEach((iss,i)=>{
+      const sevColor = iss.sev==='HIGH'?'#f87171':iss.sev==='MEDIUM'?'#facc15':'#64748b';
+      html+=`<tr>
+        <td style="color:var(--dim);font-size:9px;font-family:'JetBrains Mono',monospace">${i+1}</td>
+        <td style="font-size:10px">${iss.fc}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--a2)">${iss.id}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--a4)">${iss.field}</td>
+        <td style="font-size:10px">${iss.type}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--fog)">${iss.val}</td>
+        <td style="font-size:10px;color:var(--fog);max-width:280px">${iss.action}</td>
+        <td><span class="badge" style="color:${sevColor};background:${sevColor}22;border-color:${sevColor}44">${iss.sev}</span></td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>
+    <div class="export-row"><button class="btn-export" onclick="exportTableCSV('quality-tbl','data_quality_issues.csv')">⬇ Export Issues CSV</button></div>`;
+  } else {
+    html += `<div class="panel" style="text-align:center;padding:40px"><div style="font-size:32px;margin-bottom:12px">✅</div><div style="color:var(--a1);font-family:'Syne',sans-serif;font-weight:700">No Issues Detected</div><div style="color:var(--dim);font-size:12px;margin-top:6px">All records passed quality checks</div></div>`;
+  }
+
+  document.getElementById('tab-quality').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 4 — SPATIAL
+// ══════════════════════════════════════════════════════════════════════════════
+function buildSpatial() {
+  const all = getAll();
+  let html = '';
+
+  // Suburb summary
+  const suburbMap = {};
+  all.forEach(r=>{
+    const s=r.Suburb||'Unknown'; const sc=getScore(r);
+    if(!suburbMap[s]) suburbMap[s]={total:0,scores:[],critical:0};
+    suburbMap[s].total++;
+    if(sc>0){suburbMap[s].scores.push(sc); if(sc<4) suburbMap[s].critical++;}
+  });
+
+  const suburbRows = Object.entries(suburbMap).map(([s,d])=>({
+    suburb:s, total:d.total,
+    avgScore:d.scores.length?avg(d.scores):0,
+    minScore:d.scores.length?Math.min(...d.scores):0,
+    critical:d.critical,
+    risk: d.scores.length&&avg(d.scores)<4||d.critical>=2?'HIGH':
+          avg(d.scores)<6||d.critical>=1?'MEDIUM':'LOW'
+  })).sort((a,b)=>a.avgScore-b.avgScore);
+
+  const highRisk = suburbRows.filter(r=>r.risk==='HIGH').length;
+  html += `<div class="kpi-strip">
+    <div class="kpi-card" style="--kc:#38bdf8"><div class="kpi-label">Suburbs Covered</div><div class="kpi-value">${suburbRows.length}</div><div class="kpi-sub">with asset records</div></div>
+    <div class="kpi-card" style="--kc:#f87171"><div class="kpi-label">High Risk Suburbs</div><div class="kpi-value">${highRisk}</div><div class="kpi-sub">avg score < 4 or 2+ critical</div></div>
+    <div class="kpi-card" style="--kc:#4fffb0"><div class="kpi-label">Best Suburb</div><div class="kpi-value" style="font-size:14px">${suburbRows[suburbRows.length-1]?.suburb||'—'}</div><div class="kpi-sub">highest avg condition</div></div>
+    <div class="kpi-card" style="--kc:#f87171"><div class="kpi-label">Worst Suburb</div><div class="kpi-value" style="font-size:14px">${suburbRows[0]?.suburb||'—'}</div><div class="kpi-sub">lowest avg condition</div></div>
+  </div>`;
+
+  html += `<div class="section-title">Asset Condition by Suburb</div>
+  <div class="toolbar">
+    <input class="search-input" placeholder="Filter suburb…" oninput="filterTable('suburb-tbl',this.value)">
+    <select class="filter-sel" onchange="filterTableByCol('suburb-tbl','Risk',this.value)">
+      <option value="">All Risk Levels</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+    </select>
+  </div>
+  <div class="tbl-wrap"><table id="suburb-tbl">
+  <thead><tr>
+    <th onclick="sortTable('suburb-tbl',0)">Suburb</th>
+    <th onclick="sortTable('suburb-tbl',1)">Total Assets</th>
+    <th onclick="sortTable('suburb-tbl',2)">Avg Score</th>
+    <th onclick="sortTable('suburb-tbl',3)">Min Score</th>
+    <th onclick="sortTable('suburb-tbl',4)">Critical Assets</th>
+    <th>Score Distribution</th>
+    <th>Risk Level</th>
+  </tr></thead><tbody>`;
+
+  suburbRows.forEach(r=>{
+    const riskBadge = r.risk==='HIGH'?'<span class="badge badge-fail">HIGH</span>':
+      r.risk==='MEDIUM'?'<span class="badge badge-warn">MEDIUM</span>':
+      '<span class="badge badge-ok">LOW</span>';
+    const barW = Math.round(r.avgScore/10*100);
+    html+=`<tr>
+      <td style="font-weight:600">${r.suburb}</td>
+      <td style="font-family:'JetBrains Mono',monospace;text-align:right">${r.total}</td>
+      <td>${scoreBadge(r.avgScore.toFixed(1))}</td>
+      <td style="color:${scoreColor(r.minScore)};font-family:'JetBrains Mono',monospace">${r.minScore.toFixed(1)}</td>
+      <td style="color:${r.critical>0?'#f87171':'#4a5568'};font-family:'JetBrains Mono',monospace">${r.critical||'—'}</td>
+      <td><div class="mini-bar"><div class="bar-track"><div class="bar-fill" style="width:${barW}%;background:${scoreColor(r.avgScore)}"></div></div></div></td>
+      <td>${riskBadge}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+
+  // Age band analysis
+  if(LOADED.pavement) {
+    html+=`<div class="section-title">Pavement Age Band Analysis</div><div class="tbl-wrap"><table>
+    <thead><tr><th>Age Band</th><th>Count</th><th>% Network</th><th>Avg Score</th><th>Total Length (m)</th><th>Risk Indicator</th></tr></thead><tbody>`;
+    const bands=[['0–10 yrs',0,10],['11–20 yrs',11,20],['21–30 yrs',21,30],['31–40 yrs',31,40],['40+ yrs',41,200]];
+    const total=LOADED.pavement.length;
+    bands.forEach(([label,lo,hi])=>{
+      const rows=LOADED.pavement.filter(r=>{const a=YEAR-parseInt(r.YearConstructed);return a>=lo&&a<=hi;});
+      if(!rows.length) return;
+      const scores=rows.map(getScore).filter(s=>s>0);
+      const a=avg(scores).toFixed(1);
+      const tlen=rows.reduce((s,r)=>s+(parseFloat(r.SegmentLength_m)||0),0).toFixed(0);
+      const pct=Math.round(rows.length/total*100);
+      const risk=parseInt(label)>30||a<5?'⚠ High':'';
+      html+=`<tr>
+        <td style="font-weight:600">${label}</td>
+        <td style="font-family:'JetBrains Mono',monospace">${rows.length}</td>
+        <td><div class="mini-bar"><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--a2)"></div></div><span style="font-size:10px;margin-left:4px">${pct}%</span></div></td>
+        <td>${scoreBadge(a)}</td>
+        <td style="font-family:'JetBrains Mono',monospace">${parseInt(tlen).toLocaleString()}</td>
+        <td style="color:${risk?'#facc15':'#4fffb0'};font-size:11px">${risk||'✓ OK'}</td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  }
+
+  // DDA compliance
+  html+=`<div class="section-title">DDA Compliance — Bus Stops & Pathways</div><div class="two-col">`;
+  [{key:'busstop',label:'Bus Stop Infrastructure',icon:'🚌'},{key:'pathway',label:'Pathways',icon:'🚶'}].forEach(fc=>{
+    const rows=LOADED[fc.key]||[];
+    if(!rows.length) return;
+    const yes=rows.filter(r=>r.DDACompliant==='Yes').length;
+    const partial=rows.filter(r=>r.DDACompliant==='Partial').length;
+    const no=rows.filter(r=>r.DDACompliant==='No').length;
+    const pct=Math.round(yes/rows.length*100);
+    html+=`<div class="panel"><div class="panel-title">${fc.icon} ${fc.label} — DDA Status</div>
+      <div class="donut-wrap">
+        ${donutSVG([yes,partial,no],['#4fffb0','#facc15','#f87171'],80)}
+        <div class="donut-legend">
+          ${[['Compliant',yes,'#4fffb0'],['Partial',partial,'#facc15'],['Non-compliant',no,'#f87171']].map(([l,v,c])=>`
+          <div class="donut-item"><div class="donut-dot" style="background:${c}"></div><div class="donut-label">${l}</div><div class="donut-val">${v} <span style="color:var(--dim)">(${Math.round(v/rows.length*100)}%)</span></div></div>`).join('')}
+          <div style="margin-top:10px;font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:${scoreColor(pct/10)}">${pct}% <span style="font-size:11px;color:var(--dim)">compliant</span></div>
+        </div>
+      </div></div>`;
+  });
+  html+=`</div>`;
+
+  document.getElementById('tab-spatial').innerHTML = html;
+}
+
+function donutSVG(values, colors, size=80) {
+  const total = values.reduce((a,b)=>a+b,0)||1;
+  let offset=0; const r=28; const cx=size/2; const cy=size/2;
+  const circumference=2*Math.PI*r;
+  let paths='';
+  values.forEach((v,i)=>{
+    if(!v) return;
+    const pct=v/total; const len=circumference*pct;
+    paths+=`<circle r="${r}" cx="${cx}" cy="${cy}" fill="none" stroke="${colors[i]}" stroke-width="10" stroke-dasharray="${len} ${circumference-len}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})" opacity="0.85"/>`;
+    offset+=len;
+  });
+  return `<svg width="${size}" height="${size}" class="donut-svg">${paths}</svg>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 5 — PERFORMANCE
+// ══════════════════════════════════════════════════════════════════════════════
+function buildPerformance() {
+  let html = '';
+
+  // Avg score per feature class — visual bars
+  html+=`<div class="section-title">Average Condition Score — All Feature Classes</div>
+  <div class="panel">`;
+  FC_CONFIG.forEach(fc=>{
+    const rows=LOADED[fc.key]||[];
+    if(!rows.length) return;
+    const scores=rows.map(getScore).filter(s=>s>0);
+    const a=avg(scores); const pct=a/10*100;
+    html+=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div style="width:160px;font-size:11px;color:var(--fog)">${fc.icon} ${fc.label}</div>
+      <div style="flex:1;background:var(--line);border-radius:4px;height:8px;max-width:400px">
+        <div style="width:${pct}%;height:100%;border-radius:4px;background:${scoreColor(a)};transition:width .5s"></div>
+      </div>
+      <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:${scoreColor(a)};width:40px">${a.toFixed(1)}</div>
+      <div style="font-size:10px;color:var(--dim);width:50px">${rows.length} recs</div>
+    </div>`;
+  });
+  html+=`</div>`;
+
+  // Score distribution table
+  html+=`<div class="section-title">Score Distribution Detail</div>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Feature Class</th><th>1–2</th><th>2–3</th><th>3–4</th><th>4–5</th><th>5–6</th><th>6–7</th><th>7–8</th><th>8–9</th><th>9–10</th><th>Mean</th><th>Std Dev</th></tr></thead>
+  <tbody>`;
+  const bands=[[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10]];
+  FC_CONFIG.forEach(fc=>{
+    const rows=LOADED[fc.key]||[];
+    if(!rows.length) return;
+    const scores=rows.map(getScore).filter(s=>s>0);
+    const mn=avg(scores);
+    const sd=Math.sqrt(scores.reduce((a,s)=>a+(s-mn)**2,0)/scores.length);
+    html+=`<tr><td style="color:${fc.color};font-weight:600">${fc.icon} ${fc.label}</td>`;
+    bands.forEach(([lo,hi])=>{
+      const cnt=scores.filter(s=>s>=lo&&s<hi).length;
+      const c=lo<4?'#f87171':lo<7?'#facc15':'#4fffb0';
+      html+=`<td style="text-align:center;font-family:'JetBrains Mono',monospace;color:${cnt?c:'#4a5568'}">${cnt||'·'}</td>`;
+    });
+    html+=`<td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${scoreColor(mn)}">${mn.toFixed(1)}</td>
+    <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim)">${sd.toFixed(1)}</td></tr>`;
+  });
+  html+=`</tbody></table></div>`;
+
+  // Surface type breakdown
+  if(LOADED.pavement){
+    html+=`<div class="section-title">Pavement Surface Type Performance</div><div class="tbl-wrap"><table>
+    <thead><tr><th>Surface Type</th><th>Count</th><th>% Network</th><th>Avg Score</th><th>Min Score</th><th>Total Length (m)</th><th>Performance</th></tr></thead><tbody>`;
+    const surfMap={};
+    LOADED.pavement.forEach(r=>{
+      const s=r.SurfaceType||'Unknown';
+      if(!surfMap[s])surfMap[s]={count:0,scores:[],length:0};
+      surfMap[s].count++; surfMap[s].length+=(parseFloat(r.SegmentLength_m)||0);
+      const sc=getScore(r); if(sc>0) surfMap[s].scores.push(sc);
+    });
+    const total=LOADED.pavement.length;
+    Object.entries(surfMap).sort((a,b)=>b[1].count-a[1].count).forEach(([surf,d])=>{
+      const a=avg(d.scores).toFixed(1);
+      const pct=Math.round(d.count/total*100);
+      const mn=d.scores.length?Math.min(...d.scores).toFixed(1):'—';
+      html+=`<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--a2)">${surf}</td>
+        <td style="font-family:'JetBrains Mono',monospace">${d.count}</td>
+        <td><div class="mini-bar"><div class="bar-track"><div class="bar-fill" style="width:${pct*3}px;background:var(--a2)"></div></div><span style="font-size:10px;margin-left:4px">${pct}%</span></div></td>
+        <td>${scoreBadge(a)}</td>
+        <td style="color:${scoreColor(mn)};font-family:'JetBrains Mono',monospace">${mn}</td>
+        <td style="font-family:'JetBrains Mono',monospace">${d.length.toFixed(0)}</td>
+        <td><span class="badge" style="color:${scoreColor(a)};background:${scoreColor(a)}22;border-color:${scoreColor(a)}44">${parseFloat(a)>=7?'GOOD':parseFloat(a)>=4?'WATCH':'CRITICAL'}</span></td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  }
+
+  document.getElementById('tab-performance').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 6 — BROWSE
+// ══════════════════════════════════════════════════════════════════════════════
+function buildBrowse() {
+  let html = `<div class="section-title">Browse All Asset Records</div>`;
+
+  html += `<div class="toolbar">
+    <input class="search-input" placeholder="Search name, suburb, asset ID…" oninput="filterTable('browse-tbl',this.value)" id="browse-search">
+    <select class="filter-sel" id="browse-fc" onchange="buildBrowseTable()">
+      <option value="">All Feature Classes</option>
+      ${FC_CONFIG.filter(fc=>LOADED[fc.key]).map(fc=>`<option value="${fc.key}">${fc.icon} ${fc.label}</option>`).join('')}
+    </select>
+    <select class="filter-sel" id="browse-band" onchange="buildBrowseTable()">
+      <option value="">All Conditions</option>
+      <option value="critical">Critical (<4)</option>
+      <option value="watch">Watch (4–7)</option>
+      <option value="good">Good (≥7)</option>
+    </select>
+    <span class="count-label" id="browse-count"></span>
+  </div>
+  <div id="browse-tbl-wrap"></div>
+  <div class="export-row">
+    <button class="btn-export" onclick="exportAllCSV()">⬇ Export All Records</button>
+  </div>`;
+
+  document.getElementById('tab-browse').innerHTML = html;
+  buildBrowseTable();
+}
+
+function buildBrowseTable() {
+  const fcFilter = document.getElementById('browse-fc')?.value||'';
+  const bandFilter = document.getElementById('browse-band')?.value||'';
+  const searchVal = document.getElementById('browse-search')?.value?.toLowerCase()||'';
+
+  let rows = [];
+  FC_CONFIG.forEach(fc=>{
+    if(fcFilter&&fc.key!==fcFilter) return;
+    (LOADED[fc.key]||[]).forEach(r=>{
+      const sc=getScore(r);
+      const band=sc<4?'critical':sc<7?'watch':'good';
+      if(bandFilter&&band!==bandFilter) return;
+      const allText=Object.values(r).join(' ').toLowerCase();
+      if(searchVal&&!allText.includes(searchVal)) return;
+      rows.push({...r,_fc:fc.key,_label:fc.label,_icon:fc.icon,_color:fc.color,_band:band});
+    });
+  });
+
+  document.getElementById('browse-count').textContent=`${rows.length} records`;
+
+  let html=`<div class="tbl-wrap" style="max-height:520px"><table id="browse-tbl">
+  <thead><tr><th>#</th><th>Asset ID</th><th>Name / Description</th><th>Feature Class</th><th>Suburb</th><th>Score</th><th>Year</th><th>Condition</th></tr></thead>
+  <tbody>`;
+  rows.slice(0,200).forEach((r,i)=>{
+    const fc=FC_CONFIG.find(f=>f.key===r._fc);
+    const name=r[fc?.nameField]||r.AssetID||'—';
+    const yr=r[fc?.yearField]||'—';
+    const sc=getScore(r);
+    const bandBadge=sc<4?'<span class="badge badge-fail">CRITICAL</span>':sc<7?'<span class="badge badge-warn">WATCH</span>':'<span class="badge badge-ok">GOOD</span>';
+    html+=`<tr>
+      <td style="color:var(--dim);font-size:9px;font-family:'JetBrains Mono',monospace">${i+1}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${r._color}">${r.AssetID||r.BridgeID||'—'}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;font-size:11px">${name}</td>
+      <td style="font-size:11px">${r._icon} ${r._label}</td>
+      <td style="font-size:11px">${r.Suburb||'—'}</td>
+      <td>${scoreBadge(sc)}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim)">${yr}</td>
+      <td>${bandBadge}</td>
+    </tr>`;
+  });
+  if(rows.length>200) html+=`<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:12px;font-size:11px">Showing first 200 of ${rows.length} records. Use filters to narrow results.</td></tr>`;
+  html+=`</tbody></table></div>`;
+  document.getElementById('browse-tbl-wrap').innerHTML=html;
+}
+
+// ── TABLE UTILITIES ──────────────────────────────────────────────────────────
+function filterTable(id, q) {
+  const tbl=document.getElementById(id); if(!tbl) return;
+  const rows=tbl.querySelectorAll('tbody tr');
+  const ql=q.toLowerCase();
+  rows.forEach(r=>{ r.style.display=r.textContent.toLowerCase().includes(ql)?'':'none'; });
+}
+
+function filterTableByCol(tblId, colName, val) {
+  const tbl=document.getElementById(tblId); if(!tbl) return;
+  const ths=[...tbl.querySelectorAll('thead th')];
+  const ci=ths.findIndex(th=>th.textContent.trim()===colName);
+  if(ci<0) return;
+  tbl.querySelectorAll('tbody tr').forEach(r=>{
+    const cell=r.cells[ci]; if(!cell) return;
+    r.style.display=(!val||cell.textContent.trim()===val)?'':'none';
+  });
+}
+
+let sortState={};
+function sortTable(id,col) {
+  const tbl=document.getElementById(id); if(!tbl) return;
+  const key=id+col; const asc=sortState[key]===undefined?true:!sortState[key];
+  sortState[key]=asc;
+  const th=tbl.querySelectorAll('th');
+  th.forEach(t=>t.classList.remove('sort-asc','sort-desc'));
+  th[col]?.classList.add(asc?'sort-asc':'sort-desc');
+  const rows=[...tbl.querySelectorAll('tbody tr')];
+  rows.sort((a,b)=>{
+    const va=a.cells[col]?.textContent.trim()||'';
+    const vb=b.cells[col]?.textContent.trim()||'';
+    const na=parseFloat(va), nb=parseFloat(vb);
+    return (!isNaN(na)&&!isNaN(nb)?(na-nb):va.localeCompare(vb))*(asc?1:-1);
+  });
+  rows.forEach(r=>tbl.querySelector('tbody').appendChild(r));
+}
+
+function exportTableCSV(id, filename) {
+  const tbl=document.getElementById(id); if(!tbl) return;
+  const rows=[...tbl.querySelectorAll('tr')].filter(r=>r.style.display!=='none');
+  const csv=rows.map(r=>[...r.cells].map(c=>`"${c.textContent.replace(/"/g,'""').trim()}"`).join(',')).join('\n');
+  const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=filename; a.click();
+}
+
+function exportAllCSV() {
+  const all=getAll();
+  if(!all.length) return;
+  const cols=['AssetID','_label','Suburb','ConditionScore'];
+  const csv=[cols.join(','),...all.map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
+  const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='all_assets.csv'; a.click();
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB: 10-YR FORECAST
+// ══════════════════════════════════════════════════════════════════════════════
+// Straight-line deterioration: score = 10 × (1 − age/usefulLife)
+function forecastScore(curScore, age, ul, yearsAhead) {
+  // Use current score to calibrate the curve: infer consumed life from score
+  const consumed = ul * (1 - curScore/10);
+  const projAge = consumed + yearsAhead;
+  return Math.max(0, 10*(1 - projAge/ul));
+}
+
+const SCENARIOS = {
+  conservative: { label:'Conservative (≤ 4.0)', desc:'Renew when score drops to 4', threshold:4.0, color:'#4fffb0' },
+  moderate:     { label:'Moderate (≤ 5.0)',      desc:'Renew when score drops to 5', threshold:5.0, color:'#ffd166' },
+  aggressive:   { label:'Aggressive (≤ 6.0)',    desc:'Renew when score drops to 6', threshold:6.0, color:'#f87171' },
+};
+
+function calcForecastByYear(threshold) {
+  const result = {};
+  for(let y=YEAR; y<=YEAR+10; y++) result[y]=[];
+  FC_CONFIG.forEach(fc=>{
+    (LOADED[fc.key]||[]).forEach(r=>{
+      const sc=getScore(r); if(sc<=0) return;
+      const ul=parseInt(r.UsefulLife)||USEFUL_LIFE[fc.key];
+      const age=YEAR-(parseInt(r[fc.yearField])||YEAR);
+      // Find first year score crosses below threshold
+      for(let ahead=0; ahead<=10; ahead++){
+        const projSc=forecastScore(sc,age,ul,ahead);
+        const prevSc=ahead===0?sc:forecastScore(sc,age,ul,ahead-1);
+        if(projSc<=threshold && prevSc>threshold){
+          const y=YEAR+ahead;
+          if(result[y]) result[y].push({
+            assetID:r.AssetID||r.BridgeID||'—',
+            name:r[fc.nameField]||r.AssetID||'—',
+            fc:fc.key, label:fc.label, icon:fc.icon, color:fc.color,
+            geom:r.GeometryType||fc.geomType,
+            curScore:sc, projScore:+projSc.toFixed(1),
+            rv:parseFloat(r.ReplacementValue)||Math.round(REPL_COST[fc.key](r)),
+            suburb:r.Suburb||'—',
+          });
+          break;
+        }
+      }
+    });
+  });
+  return result;
+}
+
+function buildForecast() {
+  const scen=SCENARIOS[_activeScenario];
+  const byYear=calcForecastByYear(scen.threshold);
+  const yrs=Object.keys(byYear).map(Number);
+  const totalAssets=yrs.reduce((s,y)=>s+byYear[y].length,0);
+  const totalCost=yrs.reduce((s,y)=>s+byYear[y].reduce((a,r)=>a+r.rv,0),0);
+  const peakYr=yrs.reduce((b,y)=>byYear[y].length>byYear[b].length?y:b,yrs[0]);
+  const maxCount=Math.max(1,...yrs.map(y=>byYear[y].length));
+
+  let html=`<div class="scenario-bar">
+    ${Object.entries(SCENARIOS).map(([k,v])=>`<button class="scen-btn ${k===_activeScenario?'active':''}" onclick="_activeScenario='${k}';buildForecast();">${v.label}</button>`).join('')}
+    <span style="font-size:10px;color:var(--dim);font-family:'JetBrains Mono',monospace;margin-left:6px">${scen.desc} — straight-line deterioration model</span>
+  </div>
+  <div class="kpi-strip">
+    <div class="kpi-card" style="--kc:${scen.color}"><div class="kpi-label">Assets Due (10yr)</div><div class="kpi-value">${totalAssets}</div><div class="kpi-sub">scenario: ${_activeScenario}</div></div>
+    <div class="kpi-card" style="--kc:#c77dff"><div class="kpi-label">Total Renewal Cost</div><div class="kpi-value">${fmtAUD(totalCost)}</div><div class="kpi-sub">10-year program</div></div>
+    <div class="kpi-card" style="--kc:#f87171"><div class="kpi-label">Peak Year</div><div class="kpi-value">${peakYr}</div><div class="kpi-sub">${byYear[peakYr]?.length||0} assets</div></div>
+    <div class="kpi-card" style="--kc:#38bdf8"><div class="kpi-label">Avg Annual Cost</div><div class="kpi-value">${fmtAUD(totalCost/10)}</div><div class="kpi-sub">per year</div></div>
+  </div>
+  <div class="section-title">Assets Due for Renewal — Year by Year</div>
+  <div class="panel">`;
+  yrs.forEach(y=>{
+    const cnt=byYear[y].length, cost=byYear[y].reduce((a,r)=>a+r.rv,0);
+    const pct=cnt/maxCount*100;
+    const bc=cnt>=maxCount*0.7?'#f87171':cnt>=maxCount*0.4?'#ffd166':'#4fffb0';
+    html+=`<div class="yr-bar-wrap">
+      <span class="yr-bar-label">${y}</span>
+      <div class="yr-bar-track"><div class="yr-bar-fill" style="width:${pct}%;background:${bc}"></div></div>
+      <span class="yr-bar-meta">${cnt} assets · ${fmtAUD(cost)}</span>
+    </div>`;
+  });
+  html+=`</div><div class="section-title">Detail — Assets Due for Replacement</div>
+  <div class="toolbar">
+    <input class="search-input" placeholder="Search name, suburb…" oninput="filterTable('fc-tbl',this.value)">
+    <select class="filter-sel" onchange="filterTableByCol('fc-tbl','Year',this.value)">
+      <option value="">All Years</option>${yrs.map(y=>`<option>${y}</option>`).join('')}
+    </select>
+    <span class="count-label">${totalAssets} assets</span>
+  </div>
+  <div class="tbl-wrap"><table id="fc-tbl">
+  <thead><tr><th onclick="sortTable('fc-tbl',0)">Year</th><th>Asset ID</th><th>Name</th><th>Feature Class</th><th>Geometry</th><th>Suburb</th><th onclick="sortTable('fc-tbl',6)">Cur. Score</th><th onclick="sortTable('fc-tbl',7)">Proj. Score</th><th onclick="sortTable('fc-tbl',8)">Repl. Value</th></tr></thead><tbody>`;
+  yrs.forEach(y=>{
+    byYear[y].forEach(r=>{
+      const gc=r.geom==='Point'?'#f472b6':r.geom==='Polyline'?'#4fffb0':'#38bdf8';
+      html+=`<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-weight:600;color:${y===peakYr?'#f87171':'var(--a4)'}">${y}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${r.color}">${r.assetID}</td>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${r.name}</td>
+        <td>${r.icon} ${r.label}</td>
+        <td><span class="badge" style="color:${gc};background:${gc}22;border-color:${gc}44">${r.geom}</span></td>
+        <td>${r.suburb}</td>
+        <td>${scoreBadge(r.curScore)}</td>
+        <td style="font-family:'JetBrains Mono',monospace;color:${scoreColor(r.projScore)}">${r.projScore}</td>
+        <td style="font-family:'JetBrains Mono',monospace;color:var(--a5)">${fmtAUD(r.rv)}</td>
+      </tr>`;
+    });
+  });
+  html+=`</tbody></table></div>
+  <div class="export-row"><button class="btn-export" onclick="exportTableCSV('fc-tbl','forecast_${_activeScenario}.csv')">⬇ Export CSV</button></div>`;
+  document.getElementById('tab-forecast').innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB: FUNDING MODEL
+// ══════════════════════════════════════════════════════════════════════════════
+function buildFunding() {
+  const yrs=Array.from({length:11},(_,i)=>YEAR+i);
+  // Compute annual + cumulative for all 3 scenarios
+  const scenKeys=Object.keys(SCENARIOS);
+  const annualData={}, cumData={};
+  scenKeys.forEach(k=>{
+    const byYear=calcForecastByYear(SCENARIOS[k].threshold);
+    annualData[k]={}; let cum=0; cumData[k]={};
+    yrs.forEach(y=>{ const c=byYear[y].reduce((a,r)=>a+r.rv,0); annualData[k][y]=c; cum+=c; cumData[k][y]=cum; });
+  });
+  const maxAnnual=Math.max(1,...scenKeys.flatMap(k=>yrs.map(y=>annualData[k][y])));
+  const totals=Object.fromEntries(scenKeys.map(k=>[k,yrs.reduce((s,y)=>s+annualData[k][y],0)]));
+
+  let html=`<div class="kpi-strip">
+    ${scenKeys.map(k=>`<div class="kpi-card" style="--kc:${SCENARIOS[k].color}"><div class="kpi-label">${SCENARIOS[k].label.split(' ')[0]}</div><div class="kpi-value">${fmtAUD(totals[k])}</div><div class="kpi-sub">10-yr total</div></div>`).join('')}
+    <div class="kpi-card" style="--kc:#a78bfa"><div class="kpi-label">Avg Annual (Mod.)</div><div class="kpi-value">${fmtAUD(totals.moderate/10)}</div><div class="kpi-sub">moderate scenario</div></div>
+  </div>
+  <div class="section-title">Annual Funding Requirement — All Scenarios</div>
+  <div class="panel">`;
+  yrs.forEach(y=>{
+    html+=`<div style="margin-bottom:13px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--fog);margin-bottom:5px">${y}</div>`;
+    scenKeys.forEach(k=>{
+      const v=annualData[k][y], pct=v/maxAnnual*100;
+      html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+        <span style="width:100px;font-size:9px;font-family:'JetBrains Mono',monospace;color:${SCENARIOS[k].color}">${SCENARIOS[k].label.split('(')[0].trim()}</span>
+        <div style="flex:1;max-width:500px;height:14px;background:var(--ink3);border-radius:3px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${SCENARIOS[k].color};opacity:.75;transition:width .4s"></div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);min-width:70px;text-align:right">${fmtAUD(v)}</span>
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</div>
+  <div class="section-title">Cumulative Funding Comparison</div>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Year</th>
+    ${scenKeys.map(k=>`<th style="color:${SCENARIOS[k].color}">${SCENARIOS[k].label.split('(')[0].trim()} Annual</th><th style="color:${SCENARIOS[k].color}">Cumulative</th>`).join('')}
+  </tr></thead><tbody>`;
+  yrs.forEach(y=>{
+    html+=`<tr><td style="font-family:'JetBrains Mono',monospace;font-weight:600">${y}</td>`;
+    scenKeys.forEach(k=>{
+      html+=`<td style="font-family:'JetBrains Mono',monospace;color:${SCENARIOS[k].color}">${fmtAUD(annualData[k][y])}</td>
+             <td style="font-family:'JetBrains Mono',monospace;color:var(--dim)">${fmtAUD(cumData[k][y])}</td>`;
+    });
+    html+=`</tr>`;
+  });
+  html+=`</tbody></table></div>
+  <div class="panel" style="border-left:3px solid var(--a4);margin-top:8px">
+    <div style="font-size:11px;color:var(--fog);line-height:1.8">
+      <strong style="color:var(--a4)">Methodology:</strong> Replacement timing is calculated using a straight-line consumption model.
+      Each asset's current condition score is used to infer its consumed useful life, and the score is projected forward linearly.
+      The three scenarios differ only in the condition threshold that triggers replacement (Conservative ≤4.0, Moderate ≤5.0, Aggressive ≤6.0).
+      Replacement values are estimated from ADAC-aligned unit rates (e.g. $85/m² for pavements, $11,500/m² for bridge deck)
+      and can be overridden by including a <code style="color:var(--a1)">ReplacementValue</code> field in your CSV.
+    </div>
+  </div>`;
+  document.getElementById('tab-funding').innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB: ASSET MAP (Leaflet + OSM)
+// ══════════════════════════════════════════════════════════════════════════════
+function buildMap() {
+  const panel=document.getElementById('tab-map');
+  // Only initialise once
+  if(_leafletMap) { refreshMapMarkers(); return; }
+  panel.innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+      <select class="filter-sel" id="map-fc" onchange="refreshMapMarkers()">
+        <option value="">All Feature Classes</option>
+        ${FC_CONFIG.filter(fc=>LOADED[fc.key]?.length).map(fc=>`<option value="${fc.key}">${fc.icon} ${fc.label}</option>`).join('')}
+      </select>
+      <select class="filter-sel" id="map-cond" onchange="refreshMapMarkers()">
+        <option value="">All Conditions</option>
+        <option value="critical">🔴 Critical (&lt; 4)</option>
+        <option value="watch">🟡 Watch (4–7)</option>
+        <option value="good">🟢 Good (≥ 7)</option>
+      </select>
+      <select class="filter-sel" id="map-geom" onchange="refreshMapMarkers()">
+        <option value="">All Geometry Types</option>
+        <option value="Point">Point</option>
+        <option value="Polyline">Polyline</option>
+        <option value="Polygon">Polygon</option>
+      </select>
+      <span class="count-label" id="map-count"></span>
+    </div>
+    <div class="map-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Critical (&lt; 4.0)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ffd166"></div>Watch (4–7)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4fffb0"></div>Good (≥ 7)</div>
+      <div style="width:1px;background:var(--line)"></div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(255,255,255,.6);border:2px solid #94a3b8"></div>Point</div>
+      <div class="legend-item"><div class="legend-sq"  style="background:rgba(255,255,255,.15);border:2px solid #94a3b8"></div>Polygon (area)</div>
+      <div class="legend-item"><div class="legend-line" style="background:#94a3b8"></div>Polyline (linear)</div>
+    </div>
+    <div id="asset-map"></div>
+    <div class="panel" style="margin-top:12px;border-left:3px solid var(--a2)">
+      <div style="font-size:11px;color:var(--fog);line-height:1.7">
+        <strong style="color:var(--a2)">Note on geometry:</strong>
+        Coordinates are synthetically placed within the Logan LGA bounding box (lat -27.58 to -27.78, lng 152.98 to 153.22).
+        In production, real GIS geometry from ADAC XML submissions would display assets at their true locations.
+        Geometry types follow the ADAC schema — road pavements and bridges are <strong style="color:#38bdf8">Polygon</strong>,
+        pathways/barriers/line marking are <strong style="color:#4fffb0">Polyline</strong>,
+        signals and bus stops are <strong style="color:#f472b6">Point</strong>.
+        Click any marker for full asset details.
+      </div>
+    </div>`;
+
+  _leafletMap = L.map('asset-map', {zoomControl:true}).setView([-27.67, 153.10], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom:19
+  }).addTo(_leafletMap);
+  refreshMapMarkers();
+}
+
+function refreshMapMarkers() {
+  if(!_leafletMap) return;
+  // Remove old markers
+  _leafletMap.eachLayer(l=>{ if(l instanceof L.CircleMarker || l instanceof L.Marker) _leafletMap.removeLayer(l); });
+
+  const fcF  = document.getElementById('map-fc')?.value||'';
+  const condF= document.getElementById('map-cond')?.value||'';
+  const geomF= document.getElementById('map-geom')?.value||'';
+  let count=0;
+
+  FC_CONFIG.forEach(fc=>{
+    if(fcF && fc.key!==fcF) return;
+    (LOADED[fc.key]||[]).forEach(r=>{
+      const lat=parseFloat(r.Latitude), lng=parseFloat(r.Longitude);
+      if(isNaN(lat)||isNaN(lng)) return;
+      const sc=getScore(r);
+      const band=sc<4?'critical':sc<7?'watch':'good';
+      if(condF && band!==condF) return;
+      const geom=r.GeometryType||fc.geomType;
+      if(geomF && geom!==geomF) return;
+
+      const clr=scoreColor(sc);
+      const name=r[fc.nameField]||r.AssetID||'—';
+      const yrField=r[fc.yearField]||'—';
+      const rvVal=fmtAUD(parseFloat(r.ReplacementValue)||Math.round(REPL_COST[fc.key](r)));
+      const popup=`<div style="font-family:'Instrument Sans',sans-serif;font-size:12px;min-width:190px;line-height:1.6">
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px">${fc.icon} ${name}</div>
+        <div style="color:#666;font-size:11px;margin-bottom:6px">${fc.label}</div>
+        <div style="border-top:1px solid #eee;padding-top:6px">
+          <div>Score: <strong style="color:${clr}">${sc}/10</strong></div>
+          <div>Suburb: ${r.Suburb||'—'}</div>
+          <div>Geometry: <em style="color:#888">${geom}</em></div>
+          <div>Year: ${yrField}</div>
+          <div>Useful Life: <strong>${r.UsefulLife||USEFUL_LIFE[fc.key]} yrs</strong></div>
+          <div>Repl. Value: <strong>${rvVal}</strong></div>
+        </div>
+      </div>`;
+
+      // Style marker by geometry type
+      let marker;
+      if(geom==='Point'){
+        marker=L.circleMarker([lat,lng],{radius:8, color:clr, fillColor:clr, fillOpacity:0.85, weight:2});
+      } else if(geom==='Polyline'){
+        // Diamond shape via rotated square
+        marker=L.circleMarker([lat,lng],{radius:7, color:clr, fillColor:'#0b0f1a', fillOpacity:0.9, weight:2.5, dashArray:'3,2'});
+      } else {
+        // Polygon — larger semi-transparent circle
+        marker=L.circleMarker([lat,lng],{radius:11, color:clr, fillColor:clr, fillOpacity:0.35, weight:2});
+      }
+      marker.bindPopup(popup).addTo(_leafletMap);
+      count++;
+    });
+  });
+  const el=document.getElementById('map-count');
+  if(el) el.textContent=`${count} assets shown`;
+}
+
+// ── TAB SWITCHING ────────────────────────────────────────────────────────────
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='browse') buildBrowseTable();
+  if(id==='map') { buildMap(); setTimeout(()=>{ if(_leafletMap) _leafletMap.invalidateSize(); },200); }
+  if(id==='forecast') buildForecast();
+  if(id==='funding') buildFunding();
+}
+
+// ── TOAST ────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+buildUploadGrid();
+</script>
+</body>
+</html>

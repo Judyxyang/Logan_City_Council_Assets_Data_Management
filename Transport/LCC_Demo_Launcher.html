@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LCC Demo Launcher — Judy Yang</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+:root {
+  --ink: #04080f;
+  --surf: #0a1628;
+  --surf2: #0e1f35;
+  --line: #162540;
+  --a1: #02C39A;
+  --a2: #00C2CB;
+  --a3: #3B82F6;
+  --gold: #F5A623;
+  --red: #F87171;
+  --txt: #e2e8f0;
+  --dim: #4a6080;
+  --fog: #94a3b8;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--ink);
+  color: var(--txt);
+  font-family: 'Instrument Sans', sans-serif;
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0 20px 60px;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    linear-gradient(rgba(2,195,154,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(2,195,154,.018) 1px, transparent 1px);
+  background-size: 52px 52px;
+  pointer-events: none; z-index: 0;
+}
+
+.wrap { position: relative; z-index: 1; width: 100%; max-width: 860px; }
+
+/* ── HEADER ── */
+header {
+  text-align: center;
+  padding: 52px 0 36px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 44px;
+}
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; letter-spacing: 5px; text-transform: uppercase;
+  color: var(--a1); margin-bottom: 12px; opacity: .8;
+}
+h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(28px, 5vw, 48px);
+  font-weight: 800; color: #fff; line-height: 1.1; margin-bottom: 10px;
+}
+h1 span { color: var(--a1); }
+.sub {
+  font-size: 13px; color: var(--fog); max-width: 520px; margin: 0 auto 20px;
+  line-height: 1.6;
+}
+.tip {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(2,195,154,.07); border: 1px solid rgba(2,195,154,.2);
+  border-radius: 30px; padding: 6px 16px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--a1);
+}
+
+/* ── SECTION ── */
+.section-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--dim); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 10px;
+}
+.section-label::after { content:''; flex:1; height:1px; background:var(--line); }
+
+/* ── CARD GRID ── */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 36px; }
+@media(max-width:600px) { .grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--surf);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 22px 20px;
+  cursor: pointer;
+  transition: all .22s;
+  position: relative; overflow: hidden;
+  text-decoration: none;
+  display: block;
+}
+.card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--cc, var(--a1));
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .25s;
+}
+.card:hover { border-color: var(--cc, var(--a1)); transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0,0,0,.4); background: var(--surf2); }
+.card:hover::before { transform: scaleX(1); }
+.card:active { transform: translateY(0); }
+
+.card-icon { font-size: 28px; margin-bottom: 12px; }
+.card-title {
+  font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700;
+  color: #fff; margin-bottom: 6px;
+}
+.card-desc { font-size: 11px; color: var(--fog); line-height: 1.5; margin-bottom: 14px; }
+.card-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--cc, var(--a1));
+  color: var(--ink); font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 500; letter-spacing: .5px;
+  padding: 7px 14px; border-radius: 6px;
+  transition: opacity .2s;
+}
+.card:hover .card-btn { opacity: .9; }
+.card-badge {
+  position: absolute; top: 14px; right: 14px;
+  background: rgba(2,195,154,.1); border: 1px solid rgba(2,195,154,.2);
+  border-radius: 20px; padding: 2px 8px;
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--a1);
+}
+
+/* ── ANALYSER CARD (full width) ── */
+.card-wide {
+  background: linear-gradient(135deg, #051828 0%, #071f35 100%);
+  border: 1px solid rgba(2,195,154,.3);
+  border-radius: 12px; padding: 28px 28px;
+  cursor: pointer; transition: all .22s;
+  display: flex; align-items: center; gap: 24px;
+  text-decoration: none; margin-bottom: 36px;
+  position: relative; overflow: hidden;
+}
+.card-wide::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--a1), var(--a2));
+}
+.card-wide:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
+.wide-icon { font-size: 44px; flex-shrink: 0; }
+.wide-body { flex: 1; }
+.wide-title {
+  font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800;
+  color: #fff; margin-bottom: 6px;
+}
+.wide-desc { font-size: 12px; color: var(--fog); line-height: 1.6; margin-bottom: 14px; }
+.wide-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--a1); color: var(--ink);
+  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
+  padding: 10px 22px; border-radius: 8px; transition: all .2s;
+}
+.card-wide:hover .wide-btn { background: #04dba8; }
+.wide-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.wide-tag {
+  background: rgba(2,195,154,.08); border: 1px solid rgba(2,195,154,.2);
+  border-radius: 20px; padding: 3px 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--a1);
+}
+
+/* ── INSTRUCTION PANEL ── */
+.instr {
+  background: var(--surf);
+  border: 1px solid var(--line);
+  border-radius: 12px; padding: 24px 24px;
+  margin-bottom: 36px;
+}
+.instr-title {
+  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+  color: var(--a1); margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.step {
+  display: flex; align-items: flex-start; gap: 12px;
+  margin-bottom: 10px; font-size: 12px; color: var(--txt); line-height: 1.5;
+}
+.step-n {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--a1);
+  color: var(--ink); font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── FOOTER ── */
+footer {
+  text-align: center; padding: 24px 0;
+  border-top: 1px solid var(--line);
+  font-size: 10px; color: var(--dim);
+  font-family: 'JetBrains Mono', monospace; margin-top: 20px;
+}
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--surf2); border: 1px solid var(--a1);
+  border-radius: 8px; padding: 10px 20px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--a1);
+  opacity: 0; transition: all .3s; pointer-events: none; z-index: 999; white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+/* ── PULSE BADGE ── */
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.live { animation: pulse 2s infinite; color: var(--a1); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="eyebrow">Assets Information Officer · Logan City Council · Application</div>
+    <h1>LCC Demo <span>Launcher</span></h1>
+    <p class="sub">Click any card to open the interactive file in Google browser.<br>
+    All files open directly.</p>
+    <div class="tip">
+      <span class="live">●</span>
+      Keep this page open during interview — one click to launch any demo
+    </div>
+  </header>
+
+  <!-- ANALYSER — PRIMARY CTA -->
+  <div class="section-label">Primary Demo</div>
+  <a class="card-wide" onclick="launch('transport_analysis_app.html')" href="#">
+    <div class="wide-icon">📊</div>
+    <div class="wide-body">
+      <div class="wide-title">Transport Asset Analyser</div>
+      <div class="wide-desc">
+        Upload any of the 8 CSV files and get instant analysis — condition ranking, renewal priority,
+        data quality audit, suburb risk map, performance report and full asset browser.
+      </div>
+      <div class="wide-btn">▶  Open Analyser</div>
+      <div class="wide-tags">
+        <span class="wide-tag">CSV Upload</span>
+        <span class="wide-tag">9 Analysis Tabs</span>
+        <span class="wide-tag">200 Synthetic Records</span>
+        <span class="wide-tag">Export to CSV</span>
+        <span class="wide-tag">Demo Mode</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- 3 SCHEMA DIAGRAMS -->
+  <div class="section-label">Interactive Schema Diagrams — Built from LCC ADAC Standards</div>
+  <div class="grid">
+
+    <a class="card" style="--cc:#00C2CB" onclick="launch('transport_schema_diagram.html')" href="#">
+      <div class="card-badge">15 Feature Classes</div>
+      <div class="card-icon">🛣️</div>
+      <div class="card-title">Transport Data Schema</div>
+      <div class="card-desc">
+        Roads, Bridges, Pathways, Traffic Signals, Line Marking,
+        Bus Stops, Parking, Safety Barriers. Full attribute & enumeration detail.
+      </div>
+      <div class="card-btn">▶ Open Schema</div>
+    </a>
+
+    <a class="card" style="--cc:#3B82F6" onclick="launch('stormwater_schema_diagram.html')" href="#">
+      <div class="card-badge">12 Feature Classes</div>
+      <div class="card-icon">🌊</div>
+      <div class="card-title">StormWater Data Schema</div>
+      <div class="card-desc">
+        Pipes, Pits, Channels, Detention basins, Gross Pollutant Traps,
+        Pump Stations. SEQ Code compliant structure.
+      </div>
+      <div class="card-btn" style="background:#3B82F6">▶ Open Schema</div>
+    </a>
+
+    <a class="card" style="--cc:#02C39A" onclick="launch('watersupply_schema_diagram.html')" href="#">
+      <div class="card-badge">19 Feature Classes</div>
+      <div class="card-icon">💧</div>
+      <div class="card-title">Water Supply Data Schema</div>
+      <div class="card-desc">
+        Network infrastructure, Mechanical, Instrumentation, Control,
+        Electrical assets. Aligned to SEQ Code AIS.
+      </div>
+      <div class="card-btn">▶ Open Schema</div>
+    </a>
+
+    <a class="card" style="--cc:#F5A623" onclick="launch('transport_synthetic_viewer.html')" href="#">
+      <div class="card-badge">200 Records</div>
+      <div class="card-icon">📋</div>
+      <div class="card-title">Synthetic Data Viewer</div>
+      <div class="card-desc">
+        Browse all 200 synthetic Logan transport asset records across
+        8 feature classes. Search, filter, sort and export.
+      </div>
+      <div class="card-btn" style="background:#F5A623">▶ Open Viewer</div>
+    </a>
+
+  </div>
+
+  <!-- HOW TO USE DEMO -->
+  <div class="section-label">How to Use this Demo </div>
+  <div class="instr">
+    <div class="instr-title"> ACDC Demo Using Guide</div>
+    <div class="step"><div class="step-n">1</div><div>Open <strong>this launcher page</strong> in Chrome or Edge <em>before</em> the interview starts. Keep it in a tab.</div></div>
+    <div class="step"><div class="step-n">2</div><div>Schema Diagrams: <em>" Three interactive schema diagrams from LCC's own ADAC data standards."</em></div></div>
+    <div class="step"><div class="step-n">3</div><div>Switch to this browser tab and click <strong>Transport Data Schema</strong>. Walk through 2–3 feature class cards to show depth.</div></div>
+    <div class="step"><div class="step-n">4</div><div>Switch back here and click <strong>Transport Asset Analyser</strong>. Click <em>"Load Demo Data"</em> then <em>"▶ Run Analysis"</em>.</div></div>
+    <div class="step"><div class="step-n">5</div><div>Show the <strong>Renewal Priority</strong> tab — point to URGENT assets. Then <strong>Data Quality</strong> tab.  <em>"This is the kind of analysis based on synthetic LCC data."</em></div></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function launch(file) {
+  event.preventDefault();
+  // Try to open relative file
+  const a = document.createElement('a');
+  a.href = file;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('Opening ' + file + '…');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
