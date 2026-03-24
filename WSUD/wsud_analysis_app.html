@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LCC WSUD Asset Management Analyser</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=Instrument+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --ink:  #050f0a;
+  --ink2: #091a10;
+  --ink3: #0d2218;
+  --ink4: #122a1c;
+  --line: #163322;
+  --a1:   #00e676;
+  --a2:   #29b6f6;
+  --a3:   #ff6b6b;
+  --a4:   #ffb300;
+  --a5:   #ce93d8;
+  --a6:   #ff8a65;
+  --dim:  #3a6045;
+  --fog:  #7aaa85;
+  --txt:  #d8f0e0;
+  --white:#ffffff;
+  --r:    8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--ink); color: var(--txt); font-family: 'Instrument Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,230,118,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,230,118,0.02) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+
+.app { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 0 24px 80px; }
+
+/* HEADER */
+.site-header {
+  padding: 32px 0 24px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  border-bottom: 1px solid var(--line); margin-bottom: 32px;
+}
+.logo-group { display: flex; flex-direction: column; gap: 4px; }
+.logo-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 4px; text-transform: uppercase; color: var(--a1); opacity: 0.7; }
+.logo-title { font-family: 'Syne', sans-serif; font-size: clamp(22px,3vw,36px); font-weight: 800; color: var(--white); line-height: 1; }
+.logo-title span { color: var(--a1); }
+.header-status { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--dim); text-align: right; line-height: 1.8; }
+.status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--dim); margin-right: 5px; }
+.status-dot.live { background: var(--a1); box-shadow: 0 0 6px var(--a1); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* UPLOAD */
+.upload-section { margin-bottom: 32px; }
+.upload-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 8px; margin-bottom: 12px; }
+.upload-card {
+  background: var(--ink2); border: 1px dashed var(--line); border-radius: var(--r);
+  padding: 14px 10px; text-align: center; cursor: pointer; transition: all .2s; position: relative; overflow: hidden;
+}
+.upload-card:hover { border-color: var(--a1); background: rgba(0,230,118,0.04); }
+.upload-card.loaded { border-style: solid; border-color: var(--a1); background: rgba(0,230,118,0.06); }
+.upload-card.loaded .uc-icon { opacity: 1; }
+.uc-icon { font-size: 20px; margin-bottom: 6px; opacity: 0.4; transition: opacity .2s; }
+.uc-name { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--fog); letter-spacing: 1px; margin-bottom: 4px; }
+.uc-status { font-size: 10px; color: var(--dim); }
+.uc-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--a1); font-weight: 500; }
+input[type=file] { display: none; }
+.upload-card.loaded::after { content: '✓'; position: absolute; top: 6px; right: 8px; font-size: 10px; color: var(--a1); font-family: 'JetBrains Mono', monospace; }
+
+.upload-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn-primary {
+  background: var(--a1); color: var(--ink); border: none;
+  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  padding: 10px 22px; border-radius: var(--r); cursor: pointer; transition: all .2s;
+}
+.btn-primary:hover { background: #33ffaa; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+.btn-ghost {
+  background: transparent; color: var(--fog); border: 1px solid var(--line);
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  padding: 10px 16px; border-radius: var(--r); cursor: pointer; transition: all .2s; letter-spacing: 1px;
+}
+.btn-ghost:hover { border-color: var(--a1); color: var(--a1); }
+.upload-hint { font-size: 11px; color: var(--dim); font-family: 'JetBrains Mono', monospace; }
+
+/* PROGRESS */
+.progress-wrap { display: none; margin: 12px 0; }
+.progress-bar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--a1), var(--a2)); width: 0%; transition: width .3s; border-radius: 2px; }
+.progress-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--dim); margin-top: 5px; }
+
+/* TABS */
+.tab-bar { display: flex; gap: 2px; margin-bottom: 24px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tab-bar::-webkit-scrollbar { display: none; }
+.tab-btn {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 10px 16px; border: none; background: transparent; color: var(--dim); cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; transition: all .2s;
+}
+.tab-btn:hover { color: var(--txt); }
+.tab-btn.active { color: var(--a1); border-bottom-color: var(--a1); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* KPI */
+.kpi-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 8px; margin-bottom: 24px; }
+.kpi-card { background: var(--ink2); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; position: relative; overflow: hidden; }
+.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--kc, var(--a1)); }
+.kpi-label { font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); margin-bottom: 8px; }
+.kpi-value { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; color: var(--kc, var(--a1)); line-height: 1; }
+.kpi-sub { font-size: 10px; color: var(--dim); margin-top: 4px; }
+
+/* SECTION TITLE */
+.section-title {
+  font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase; color: var(--a1);
+  margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+}
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+/* TABLE */
+.tbl-wrap { overflow-x: auto; border-radius: var(--r); border: 1px solid var(--line); margin-bottom: 24px; }
+.tbl-wrap::-webkit-scrollbar { height: 4px; } .tbl-wrap::-webkit-scrollbar-thumb { background: var(--line); }
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+thead tr { background: var(--ink3); }
+th { padding: 10px 12px; text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim); white-space: nowrap; border-bottom: 1px solid var(--line); cursor: pointer; user-select: none; }
+th:hover { color: var(--a1); }
+th.sort-asc::after { content: ' ↑'; color: var(--a1); }
+th.sort-desc::after { content: ' ↓'; color: var(--a1); }
+td { padding: 9px 12px; border-bottom: 1px solid rgba(22,51,34,0.6); white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(0,230,118,0.02); }
+
+/* BADGES */
+.badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 9px; padding: 2px 7px; border-radius: 3px; font-weight: 500; }
+.badge-urgent { background: rgba(255,107,107,0.15); color: #ff6b6b; border: 1px solid rgba(255,107,107,0.3); }
+.badge-high   { background: rgba(255,138,101,0.15); color: #ff8a65; border: 1px solid rgba(255,138,101,0.3); }
+.badge-medium { background: rgba(255,179,0,0.15);   color: #ffb300; border: 1px solid rgba(255,179,0,0.3); }
+.badge-ok     { background: rgba(0,230,118,0.1);    color: var(--a1); border: 1px solid rgba(0,230,118,0.2); }
+.badge-pass   { background: rgba(0,230,118,0.1);    color: var(--a1); border: 1px solid rgba(0,230,118,0.2); }
+.badge-warn   { background: rgba(255,179,0,0.15);   color: #ffb300; border: 1px solid rgba(255,179,0,0.3); }
+.badge-fail   { background: rgba(255,107,107,0.15); color: #ff6b6b; border: 1px solid rgba(255,107,107,0.3); }
+.badge-compliant { background: rgba(0,230,118,0.1); color: var(--a1); border: 1px solid rgba(0,230,118,0.2); }
+.badge-monitor   { background: rgba(41,182,246,0.12); color: #29b6f6; border: 1px solid rgba(41,182,246,0.3); }
+
+/* SCORE BADGE */
+.score-badge { display: inline-flex; align-items: center; gap: 5px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; }
+.score-pip { width: 30px; height: 4px; border-radius: 2px; }
+
+/* BARS */
+.mini-bar { display: flex; align-items: center; gap: 6px; }
+.bar-track { flex: 1; height: 5px; background: var(--line); border-radius: 3px; max-width: 80px; }
+.bar-fill { height: 100%; border-radius: 3px; }
+
+/* PANEL */
+.panel { background: var(--ink2); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; margin-bottom: 16px; }
+.panel-title { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; color: var(--fog); margin-bottom: 14px; letter-spacing: 1px; text-transform: uppercase; }
+
+/* DONUT */
+.donut-wrap { display: flex; align-items: center; gap: 20px; }
+.donut-svg { flex-shrink: 0; }
+.donut-legend { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+.donut-item { display: flex; align-items: center; gap: 7px; font-size: 11px; }
+.donut-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.donut-label { color: var(--fog); flex: 1; }
+.donut-val { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--txt); }
+
+/* TOOLBAR */
+.toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.search-input { flex: 1; min-width: 180px; background: var(--ink3); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 12px; color: var(--txt); font-size: 12px; font-family: 'Instrument Sans', sans-serif; outline: none; }
+.search-input:focus { border-color: var(--a1); }
+.filter-sel { background: var(--ink3); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; color: var(--txt); font-size: 11px; font-family: 'JetBrains Mono', monospace; outline: none; cursor: pointer; }
+.filter-sel:focus { border-color: var(--a1); }
+.count-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--dim); }
+
+/* EXPORT */
+.export-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.btn-export { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; padding: 7px 14px; border-radius: var(--r); border: 1px solid var(--line); background: transparent; color: var(--dim); cursor: pointer; transition: all .2s; }
+.btn-export:hover { border-color: var(--a1); color: var(--a1); }
+
+/* SUMMARY CARDS */
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 8px; margin-bottom: 24px; }
+.summary-card { background: var(--ink2); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; align-items: center; gap: 10px; }
+.sc-icon { font-size: 22px; }
+.sc-body { flex: 1; }
+.sc-name { font-size: 11px; font-weight: 600; color: var(--fog); }
+.sc-stats { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--dim); margin-top: 2px; }
+.sc-score { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; }
+
+/* LAYOUT */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+@media(max-width:768px) { .two-col { grid-template-columns: 1fr; } }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+@media(max-width:900px) { .three-col { grid-template-columns: 1fr; } }
+
+/* HEATMAP */
+.heatmap { display: grid; gap: 3px; margin-top: 8px; }
+.hm-row { display: flex; gap: 3px; align-items: center; }
+.hm-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--dim); width: 130px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+.hm-cell { width: 22px; height: 22px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 7px; color: rgba(0,0,0,0.7); font-weight: 600; cursor: default; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 24px; right: 24px; z-index: 999; background: var(--ink3); border: 1px solid var(--a1); border-radius: var(--r); padding: 12px 18px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--a1); transform: translateY(80px); opacity: 0; transition: all .3s; pointer-events: none; }
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* SCENARIO BAR */
+.scenario-bar { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+.scen-btn { background:var(--ink3); border:1px solid var(--line); color:var(--fog); font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:1px; padding:8px 14px; border-radius:var(--r); cursor:pointer; transition:all .2s; }
+.scen-btn.active { border-color:var(--a1); color:var(--a1); background:rgba(0,230,118,.08); font-weight:700; }
+
+/* YR BARS */
+.yr-bar-wrap  { display:flex; align-items:center; gap:10px; margin-bottom:7px; }
+.yr-bar-label { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--fog); width:42px; flex-shrink:0; }
+.yr-bar-track { flex:1; height:20px; background:var(--ink3); border-radius:4px; overflow:hidden; max-width:540px; }
+.yr-bar-fill  { height:100%; border-radius:4px; transition:width .4s ease; }
+.yr-bar-meta  { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--dim); white-space:nowrap; min-width:170px; }
+
+/* MAP */
+#asset-map { height:460px; border-radius:var(--r); border:1px solid var(--line); margin-bottom:16px; z-index:1; position:relative; }
+.map-legend { display:flex; gap:16px; flex-wrap:wrap; padding:10px 14px; background:var(--ink2); border:1px solid var(--line); border-radius:var(--r); margin-bottom:12px; }
+.legend-item { display:flex; align-items:center; gap:6px; font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--fog); }
+.legend-dot  { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+.legend-sq   { width:11px; height:11px; border-radius:2px; flex-shrink:0; }
+.legend-line { width:18px; height:3px; border-radius:2px; flex-shrink:0; }
+
+/* WQ COMPLIANCE PILL */
+.wq-pill { display:inline-flex; align-items:center; gap:5px; font-family:'JetBrains Mono',monospace; font-size:10px; padding:3px 8px; border-radius:20px; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="logo-group">
+      <div class="logo-eyebrow">Logan City Council · WSUD Asset Management</div>
+      <div class="logo-title">WSUD Asset <span>Analyser</span></div>
+    </div>
+    <div class="header-status" id="header-status">
+      <span class="status-dot" id="status-dot"></span>AWAITING DATA<br>
+      <span style="font-size:9px;opacity:.5">Upload CSVs or load demo data</span>
+    </div>
+  </header>
+
+  <!-- UPLOAD ZONE -->
+  <div class="upload-section">
+    <div class="upload-grid" id="upload-grid"></div>
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-label" id="progress-label">Loading…</div>
+    </div>
+    <div class="upload-actions">
+      <button class="btn-primary" id="analyse-btn" disabled onclick="runAnalysis()">▶ Run Analysis</button>
+      <button class="btn-ghost" onclick="loadDemo()">Load Demo Data</button>
+      <span class="upload-hint" id="upload-hint">0 / 7 files loaded</span>
+    </div>
+  </div>
+
+  <!-- TABS + PANELS -->
+  <div id="report-section" style="display:none">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab('summary',this)">🌿 Portfolio Summary</button>
+      <button class="tab-btn" onclick="showTab('renewal',this)">🔴 Maintenance Priority</button>
+      <button class="tab-btn" onclick="showTab('wq',this)">💧 WQ Performance</button>
+      <button class="tab-btn" onclick="showTab('offset',this)">⚖️ Offset Compliance</button>
+      <button class="tab-btn" onclick="showTab('budget',this)">💰 Budget Planning</button>
+      <button class="tab-btn" onclick="showTab('quality',this)">⚠ Data Quality</button>
+      <button class="tab-btn" onclick="showTab('map',this)">🗺 Asset Map</button>
+      <button class="tab-btn" onclick="showTab('catchment',this)">📐 Catchment Analysis</button>
+      <button class="tab-btn" onclick="showTab('browse',this)">📂 Browse</button>
+    </div>
+    <div class="tab-panel active" id="tab-summary"></div>
+    <div class="tab-panel" id="tab-renewal"></div>
+    <div class="tab-panel" id="tab-wq"></div>
+    <div class="tab-panel" id="tab-offset"></div>
+    <div class="tab-panel" id="tab-budget"></div>
+    <div class="tab-panel" id="tab-quality"></div>
+    <div class="tab-panel" id="tab-map"></div>
+    <div class="tab-panel" id="tab-catchment"></div>
+    <div class="tab-panel" id="tab-browse"></div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// WSUD FEATURE CLASS CONFIG
+// ══════════════════════════════════════════════════════════════════════════════
+const FC_CONFIG = [
+  {key:'bioretention', label:'Bioretention Basins',     icon:'🌱', color:'#00e676', file:'01_BioretentionBasins.csv',    scoreField:'ConditionGrade', yearField:'YearConstructed', nameField:'WSUD_ID', geomType:'Polygon'},
+  {key:'wetland',      label:'Constructed Wetlands',    icon:'🏞️', color:'#69f0ae', file:'02_ConstructedWetlands.csv',   scoreField:'ConditionGrade', yearField:'YearConstructed', nameField:'WSUD_ID', geomType:'Polygon'},
+  {key:'swale',        label:'Vegetated Swales',        icon:'🌾', color:'#b9f6ca', file:'03_VegetatedSwales.csv',       scoreField:'ConditionGrade', yearField:'YearInstalled',   nameField:'WSUD_ID', geomType:'Polyline'},
+  {key:'detention',    label:'Detention Basins',        icon:'🪣', color:'#40c057', file:'04_DetentionBasins.csv',       scoreField:'ConditionGrade', yearField:'YearConstructed', nameField:'WSUD_ID', geomType:'Polygon'},
+  {key:'gpt',          label:'Gross Pollutant Traps',   icon:'🔩', color:'#29b6f6', file:'05_GrossPollutantTraps.csv',   scoreField:'ConditionGrade', yearField:'YearInstalled',   nameField:'WSUD_ID', geomType:'Point'},
+  {key:'raingarden',   label:'Rain Gardens',            icon:'🌷', color:'#ce93d8', file:'06_RainGardens.csv',           scoreField:'ConditionGrade', yearField:'YearInstalled',   nameField:'WSUD_ID', geomType:'Point'},
+  {key:'porpaving',    label:'Permeable Paving',        icon:'🧱', color:'#a5d6a7', file:'07_PermeablePaving.csv',       scoreField:'ConditionGrade', yearField:'YearInstalled',   nameField:'WSUD_ID', geomType:'Polygon'},
+];
+
+// SEQ WSUD Useful Life (years)
+const USEFUL_LIFE = {bioretention:25, wetland:40, swale:20, detention:50, gpt:20, raingarden:20, porpaving:15};
+
+// Maintenance / remediation unit cost estimators (AUD)
+const REPL_COST = {
+  bioretention: r => (parseFloat(r.FilterArea_m2)||50) * 850,
+  wetland:      r => (parseFloat(r.TotalArea_m2)||500) * 420,
+  swale:        r => (parseFloat(r.Length_m)||100) * 380,
+  detention:    r => (parseFloat(r.StorageVolume_m3)||1000) * 180,
+  gpt:          r => r.DeviceClass==='GPTComplex' ? 75000 : r.DeviceClass==='GPTSimple' ? 28000 : 15000,
+  raingarden:   r => (parseFloat(r.FilterArea_m2)||15) * 1200,
+  porpaving:    r => (parseFloat(r.Area_m2)||80) * 320,
+};
+
+const LOGAN_LAT=[-27.78,-27.58], LOGAN_LNG=[152.98,153.22];
+let LOADED={}, YEAR=new Date().getFullYear(), _leafletMap=null, _activeScenario='moderate';
+const fmtAUD=n=>n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+(n/1e3).toFixed(0)+'K':'$'+Math.round(n);
+// Condition grade: 1=Excellent→5=Critical (inverse of transport 1–10 scale)
+const gradeColor = g => { const n=parseFloat(g); return isNaN(n)?'#3a6045': n<=1?'#00e676': n<=2?'#69f0ae': n<=3?'#ffb300': n<=4?'#ff8a65':'#ff6b6b'; };
+const gradeBadge = g => { const n=parseFloat(g)||0; const labels=['','Excellent','Good','Fair','Poor','Critical']; const colors=['','#00e676','#69f0ae','#ffb300','#ff8a65','#ff6b6b']; const idx=Math.min(5,Math.max(1,Math.round(n))); return `<span class="score-badge"><div class="score-pip" style="background:${colors[idx]};width:${(idx/5)*40}px;min-width:4px"></div><span style="color:${colors[idx]}">${n} ${labels[idx]||''}</span></span>`; };
+const priorityBadge = p => `<span class="badge badge-${p.toLowerCase()}">${p}</span>`;
+const avg = arr => arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length) : 0;
+const getGrade = row => parseFloat(row.ConditionGrade)||0;
+
+function getAll() {
+  return FC_CONFIG.flatMap(fc=>(LOADED[fc.key]||[]).map(r=>({...r,_fc:fc.key,_label:fc.label,_icon:fc.icon,_color:fc.color})));
+}
+
+// ── UPLOAD ─────────────────────────────────────────────────────────────────
+function buildUploadGrid() {
+  document.getElementById('upload-grid').innerHTML = FC_CONFIG.map(fc=>`
+    <label class="upload-card" id="uc-${fc.key}" for="fi-${fc.key}" title="Upload ${fc.file}">
+      <input type="file" id="fi-${fc.key}" accept=".csv" onchange="handleFile('${fc.key}',this)">
+      <div class="uc-icon">${fc.icon}</div>
+      <div class="uc-name">${fc.label}</div>
+      <div class="uc-status" id="us-${fc.key}">Click to upload</div>
+    </label>`).join('');
+}
+
+function handleFile(key, input) {
+  if(!input.files[0]) return;
+  Papa.parse(input.files[0], { header:true, skipEmptyLines:true, complete:(res)=>{
+    LOADED[key]=res.data;
+    document.getElementById(`uc-${key}`).classList.add('loaded');
+    document.getElementById(`us-${key}`).innerHTML=`<span class="uc-count">${res.data.length} rows</span>`;
+    updateUploadState();
+  }});
+}
+
+function updateUploadState() {
+  const n=Object.keys(LOADED).length;
+  document.getElementById('upload-hint').textContent=`${n} / ${FC_CONFIG.length} files loaded`;
+  document.getElementById('analyse-btn').disabled = n===0;
+  if(n===FC_CONFIG.length) {
+    document.getElementById('status-dot').classList.add('live');
+    document.getElementById('header-status').innerHTML='<span class="status-dot live"></span>ALL FILES LOADED<br><span style="font-size:9px;opacity:.5">Ready to analyse</span>';
+  }
+}
+
+// ── DEMO DATA ──────────────────────────────────────────────────────────────
+function loadDemo() { showToast('Generating WSUD demo data…'); generateDemoData(); runAnalysis(); }
+
+function generateDemoData() {
+  const suburbs = ['Logan Central','Woodridge','Slacks Creek','Kingston','Loganlea','Springwood','Daisy Hill','Marsden','Eagleby','Meadowbrook','Beenleigh','Berrinba','Cornubia','Carbrook','Greenbank','Browns Plains','Hillcrest','Park Ridge','Boronia Heights','Logan Reserve'];
+  const rnd=(a,b,d=1)=>+((Math.random()*(b-a)+a).toFixed(d));
+  const pick=(...a)=>a[Math.floor(Math.random()*a.length)];
+  const yr=(a,b)=>Math.floor(Math.random()*(b-a+1)+a);
+  const grade=()=>+(rnd(1,5,1)); // condition grade 1–5
+  const id=(p,n)=>`WSUD-${p}-${String(n).padStart(3,'0')}`;
+  const coord=()=>({Latitude:+(LOGAN_LAT[0]+Math.random()*(LOGAN_LAT[1]-LOGAN_LAT[0])).toFixed(6), Longitude:+(LOGAN_LNG[0]+Math.random()*(LOGAN_LNG[1]-LOGAN_LNG[0])).toFixed(6)});
+  const rv=(k,r)=>Math.round(REPL_COST[k](r));
+  const wqMeet=()=>pick('Yes','Yes','Yes','No');
+  const offComp=()=>pick('Active','Active','Completed','Pending','Lapsed');
+
+  // 1. Bioretention Basins (30 records)
+  LOADED.bioretention = Array.from({length:30},(_,i)=>{
+    const r={
+      WSUD_ID:id('BIO',i+1), Suburb:pick(...suburbs), GeometryType:'Polygon', ...coord(),
+      SubType:pick('Bioretention Basin','Bioretention Basin','Rain Garden','Planter Box','Bioretention Swale'),
+      FlowPath:pick('Online','Online','Offline'),
+      FilterArea_m2:rnd(10,300), FilterDepth_m:rnd(0.4,1.2), MediaType:pick('Sandy Loam','Compost Mix','Zeolite Blend'),
+      HasUnderdrainPipe:pick('Yes','Yes','No'),
+      PondingDepth_m:rnd(0.1,0.4), CatchmentArea_ha:rnd(0.2,8),
+      TSS_Reduction_pct:rnd(60,90), TP_Reduction_pct:rnd(40,80), TN_Reduction_pct:rnd(30,70),
+      VegetationHealth:pick('Excellent','Good','Good','Fair','Poor'),
+      ConditionGrade:grade(), YearConstructed:yr(2005,2023),
+      LastInspection:yr(2020,2024), MaintenanceCycle_months:pick(6,12,12,24),
+      TSS_MeetsTarget:wqMeet(), TP_MeetsTarget:wqMeet(), OffsetStatus:offComp(),
+      EstimatedRemediation_AUD:0, UsefulLife:USEFUL_LIFE.bioretention
+    }; r.EstimatedRemediation_AUD=rv('bioretention',r); return r; });
+
+  // 2. Constructed Wetlands (20 records)
+  LOADED.wetland = Array.from({length:20},(_,i)=>{
+    const r={
+      WSUD_ID:id('WET',i+1), Suburb:pick(...suburbs), GeometryType:'Polygon', ...coord(),
+      TotalArea_m2:rnd(500,8000), MacrophyteArea_m2:rnd(200,3000),
+      OpenWaterArea_m2:rnd(100,2000), SedimentForebayArea_m2:rnd(50,400),
+      PermanentPoolLevel_m:rnd(15,35), HydraulicRetTime_days:rnd(3,14),
+      MacrophyteDepth_m:rnd(0.2,0.6), OpenWaterDepth_m:rnd(0.8,2.5),
+      SedimentVol_m3:rnd(50,500), HasSpillway:pick('Yes','Yes','No'),
+      InletType:pick('Pipe','Spreader','Rock Apron'), OutletType:pick('Riser Pipe','Overflow Weir','Low-flow Orifice'),
+      CatchmentArea_ha:rnd(2,30), TSS_Reduction_pct:rnd(70,95), TP_Reduction_pct:rnd(50,85), TN_Reduction_pct:rnd(40,75),
+      ConditionGrade:grade(), YearConstructed:yr(2000,2022),
+      LastInspection:yr(2019,2024), MaintenanceCycle_months:pick(6,12,12),
+      TSS_MeetsTarget:wqMeet(), TP_MeetsTarget:wqMeet(), OffsetStatus:offComp(),
+      EstimatedRemediation_AUD:0, UsefulLife:USEFUL_LIFE.wetland
+    }; r.EstimatedRemediation_AUD=rv('wetland',r); return r; });
+
+  // 3. Vegetated Swales (30 records)
+  LOADED.swale = Array.from({length:30},(_,i)=>{
+    const r={
+      WSUD_ID:id('SWL',i+1), Suburb:pick(...suburbs), GeometryType:'Polyline', ...coord(),
+      SwaleType:pick('Grassed Swale','Grassed Swale','Enhanced Filter Swale','Buffer Strip','Dry Swale'),
+      Length_m:rnd(20,400), BaseWidth_m:rnd(0.5,4), SideSlope_H_V:pick('3:1','4:1','5:1','6:1'),
+      LongitudinalGrade_pct:rnd(0.5,5), CheckDamCount:Math.floor(rnd(0,8,0)),
+      VegetationHealth:pick('Excellent','Good','Good','Fair','Poor'),
+      CatchmentArea_ha:rnd(0.1,3),
+      ConditionGrade:grade(), YearInstalled:yr(2006,2023),
+      LastInspection:yr(2020,2024), MaintenanceCycle_months:pick(3,6,6,12),
+      TSS_MeetsTarget:wqMeet(), TP_MeetsTarget:wqMeet(), OffsetStatus:offComp(),
+      EstimatedRemediation_AUD:0, UsefulLife:USEFUL_LIFE.swale
+    }; r.EstimatedRemediation_AUD=rv('swale',r); return r; });
+
+  // 4. Detention Basins (20 records)
+  LOADED.detention = Array.from({length:20},(_,i)=>{
+    const r={
+      WSUD_ID:id('DET',i+1), Suburb:pick(...suburbs), GeometryType:'Polygon', ...coord(),
+      BasinType:pick('Dry Detention','Wet Retention','Wet Retention','Sedimentation','Infiltration'),
+      StorageVolume_m3:rnd(200,15000), SurfaceArea_m2:rnd(300,5000),
+      DesignARI_yr:pick(2,5,10,20,100), HasSpillway:pick('Yes','Yes','No'),
+      IsReferableDam:pick('No','No','No','Yes'),
+      CatchmentArea_ha:rnd(5,60),
+      ConditionGrade:grade(), YearConstructed:yr(1995,2022),
+      LastInspection:yr(2018,2024), MaintenanceCycle_months:pick(12,12,24,36),
+      TSS_MeetsTarget:wqMeet(), OffsetStatus:offComp(),
+      EstimatedRemediation_AUD:0, UsefulLife:USEFUL_LIFE.detention
+    }; r.EstimatedRemediation_AUD=rv('detention',r); return r; });
+
+  // 5. GPTs (30 records)
+  LOADED.gpt = Array.from({length:30},(_,i)=>{
+    const r={
+      WSUD_ID:id('GPT',i+1), Suburb:pick(...suburbs), GeometryType:'Point', ...coord(),
+      DeviceClass:pick('GPTComplex','GPTSimple','GPTSimple','NonGPTSimple','NonGPTSimple'),
+      DeviceBrand:pick('Ecosol','Rocla','Humes','Stormwater360','Imbrium','Council Proprietary'),
+      DesignFlow_m3s:rnd(0.05,2.5), ScreenSize_mm:pick(3,5,10,15,20,null),
+      AccessType:pick('Hatch Access','Maintenance Hole','Open Basket'),
+      LitterLoad:pick('None','Minor','Minor','Moderate','Heavy'),
+      ConditionGrade:grade(), YearInstalled:yr(2005,2023),
+      LastInspection:yr(2021,2024), MaintenanceCycle_months:pick(3,6,6,12),
+      LastCleanout:yr(2022,2024),
+      OffsetStatus:offComp(),
+      EstimatedRemediation_AUD:0, UsefulLife:USEFUL_LIFE.gpt
+    }; r.EstimatedRemediation_AUD=rv('gpt',r); return r; });
+
+  // 6. Rain Gardens (20 records)
+  LOADED.raingarden = Array.from({length:20},(_,i)=>{
+    const r={
+      WSUD_ID:id('RGD',i+1), Suburb:pick(...suburbs), GeometryType:'Point', ...coord(),
+      FilterArea_m2:rnd(3,40), FilterDepth_m:rnd(0.3,0.8), MediaType:pick('Sandy Loam','Compost Mix','Zeolite Blend'),
+      PondingDepth_m:rnd(0.1,0.3), VegetationHealth:pick('Excellent','Good','Good','Fair','Poor'),
+      CatchmentArea_ha:rnd(0.02,0.5), PlantSpecies:pick('Lomandra','Dianella','Baumea','Mixed Native'),
+      HasUnderdrainPipe:pick('Yes','No'),
+      ConditionGrade:grade(), YearInstalled:yr(2010,2023),
+      LastInspection:yr(2021,2024), MaintenanceCycle_months:pick(6,12),
+      TSS_MeetsTarget:wqMeet(), OffsetStatus:offComp(),
+      EstimatedRemediation_AUD:0, UsefulLife:USEFUL_LIFE.raingarden
+    }; r.EstimatedRemediation_AUD=rv('raingarden',r); return r; });
+
+  // 7. Permeable Paving (20 records)
+  LOADED.porpaving = Array.from({length:20},(_,i)=>{
+    const r={
+      WSUD_ID:id('PPV',i+1), Suburb:pick(...suburbs), GeometryType:'Polygon', ...coord(),
+      PavementType:pick('Porous Asphalt','Permeable Concrete','Permeable Pavers','Grass-cell'),
+      Area_m2:rnd(30,800), SubbaseDepth_m:rnd(0.2,0.8),
+      InfiltrationRate_mm_hr:rnd(20,300), HasLinedBase:pick('Yes','No','No'),
+      ConditionGrade:grade(), YearInstalled:yr(2008,2023),
+      LastInspection:yr(2020,2024), MaintenanceCycle_months:pick(6,12,12),
+      EstimatedRemediation_AUD:0, UsefulLife:USEFUL_LIFE.porpaving
+    }; r.EstimatedRemediation_AUD=rv('porpaving',r); return r; });
+
+  FC_CONFIG.forEach(fc=>{
+    if(LOADED[fc.key]) {
+      document.getElementById(`uc-${fc.key}`).classList.add('loaded');
+      document.getElementById(`us-${fc.key}`).innerHTML=`<span class="uc-count">${LOADED[fc.key].length} rows</span>`;
+    }
+  });
+  updateUploadState();
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function donutSVG(values,colors,size=80) {
+  const total=values.reduce((a,b)=>a+b,0)||1; let offset=0;
+  const r=28,cx=size/2,cy=size/2,circumference=2*Math.PI*r; let paths='';
+  values.forEach((v,i)=>{ if(!v) return; const pct=v/total; const len=circumference*pct;
+    paths+=`<circle r="${r}" cx="${cx}" cy="${cy}" fill="none" stroke="${colors[i]}" stroke-width="10" stroke-dasharray="${len} ${circumference-len}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})" opacity="0.85"/>`;
+    offset+=len; });
+  return `<svg width="${size}" height="${size}" class="donut-svg">${paths}</svg>`;
+}
+
+function filterTable(tblId,q) {
+  const rows=document.querySelectorAll(`#${tblId} tbody tr`);
+  const lq=q.toLowerCase();
+  rows.forEach(r=>{ r.style.display=r.textContent.toLowerCase().includes(lq)?'':'none'; });
+}
+
+function filterTableByCol(tblId,colName,val) {
+  const tbl=document.getElementById(tblId);
+  if(!tbl) return;
+  const headers=Array.from(tbl.querySelectorAll('thead th')).map(th=>th.textContent.replace(/[↑↓]/g,'').trim());
+  const ci=headers.indexOf(colName);
+  if(ci<0) return;
+  tbl.querySelectorAll('tbody tr').forEach(r=>{
+    const cell=r.cells[ci];
+    r.style.display=(val===''||cell?.textContent.includes(val))?'':'none';
+  });
+}
+
+function sortTable(tblId,ci) {
+  const tbl=document.getElementById(tblId); if(!tbl) return;
+  const th=tbl.querySelectorAll('thead th')[ci];
+  const asc=th.classList.toggle('sort-asc');
+  th.classList.toggle('sort-desc',!asc);
+  tbl.querySelectorAll('thead th').forEach((t,i)=>{ if(i!==ci){t.classList.remove('sort-asc','sort-desc');} });
+  const rows=Array.from(tbl.querySelectorAll('tbody tr'));
+  rows.sort((a,b)=>{ const av=a.cells[ci]?.textContent.trim()||'',bv=b.cells[ci]?.textContent.trim()||''; return !isNaN(av)&&!isNaN(bv)?(parseFloat(av)-parseFloat(bv))*(asc?1:-1):av.localeCompare(bv)*(asc?1:-1); });
+  const tb=tbl.querySelector('tbody'); rows.forEach(r=>tb.appendChild(r));
+}
+
+function exportTableCSV(tblId,filename) {
+  const tbl=document.getElementById(tblId); if(!tbl) return;
+  const rows=[...tbl.querySelectorAll('tr')].map(r=>[...r.querySelectorAll('th,td')].map(c=>'"'+(c.textContent.replace(/"/g,'""').trim())+'"').join(','));
+  const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(rows.join('\n'));
+  a.download=filename; a.click();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RUN
+// ══════════════════════════════════════════════════════════════════════════════
+function runAnalysis() {
+  const pw=document.getElementById('progress-wrap');
+  const pf=document.getElementById('progress-fill');
+  const pl=document.getElementById('progress-label');
+  pw.style.display='block';
+  const steps=['Auditing WSUD portfolio…','Scoring maintenance priorities…','Computing WQ performance…','Checking offset compliance…','Modelling remediation budget…','Auditing data quality…','Building asset map…','Analysing catchment loads…','Compiling browse view…'];
+  let i=0;
+  const interval=setInterval(()=>{
+    i++; pf.style.width=(i/steps.length*100)+'%'; pl.textContent=steps[i-1]||'Done';
+    if(i>=steps.length){ clearInterval(interval); setTimeout(()=>{
+      pw.style.display='none';
+      buildAllTabs();
+      document.getElementById('report-section').style.display='block';
+      document.getElementById('analyse-btn').textContent='↺ Re-run Analysis';
+      document.getElementById('status-dot').classList.add('live');
+      document.getElementById('header-status').innerHTML=`<span class="status-dot live"></span>ANALYSIS LIVE<br><span style="font-size:9px;opacity:.5">Updated ${new Date().toLocaleTimeString()}</span>`;
+      showToast('WSUD analysis complete ✓');
+      window.scrollTo({top:document.getElementById('report-section').offsetTop-20,behavior:'smooth'});
+    },300); }
+  },180);
+}
+
+function buildAllTabs() { buildSummary(); buildRenewal(); buildWQ(); buildOffset(); buildBudget(); buildQuality(); buildCatchment(); buildBrowse(); }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 1 — PORTFOLIO SUMMARY
+// ══════════════════════════════════════════════════════════════════════════════
+function buildSummary() {
+  const all=getAll();
+  const totalAssets=all.length;
+  const allGrades=all.map(getGrade).filter(g=>g>0);
+  const critical=allGrades.filter(g=>g>=4).length;   // grade 4–5 = Poor/Critical
+  const excellent=allGrades.filter(g=>g<=2).length;
+  const avgGrade=avg(allGrades).toFixed(1);
+  const totalRepl=all.reduce((s,r)=>s+(parseFloat(r.EstimatedRemediation_AUD)||Math.round(REPL_COST[r._fc]?.(r)||0)),0);
+  const wqFail=all.filter(r=>r.TSS_MeetsTarget==='No').length;
+  const offsetActive=all.filter(r=>r.OffsetStatus==='Active').length;
+
+  const kpis=[
+    {label:'Total WSUD Assets',     value:totalAssets,        sub:'across all classes',         color:'#29b6f6'},
+    {label:'Portfolio Avg Grade',   value:avgGrade+'/5',      sub:'1=Excellent 5=Critical',     color:gradeColor(avgGrade)},
+    {label:'Critical Assets',       value:critical,           sub:'grade ≥ 4 — act now',        color:'#ff6b6b'},
+    {label:'Excellent Condition',   value:excellent,          sub:'grade ≤ 2',                  color:'#00e676'},
+    {label:'WQ Non-Compliance',     value:wqFail,             sub:'TSS target not met',         color:'#ffb300'},
+    {label:'Active Offsets',        value:offsetActive,       sub:'offset obligations live',    color:'#ce93d8'},
+    {label:'Portfolio Asset Value', value:fmtAUD(totalRepl),  sub:'estimated remediation cost', color:'#ff8a65'},
+  ];
+
+  let html=`<div class="kpi-strip">${kpis.map(k=>`<div class="kpi-card" style="--kc:${k.color}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('')}</div>`;
+
+  html+=`<div class="section-title">Feature Class Overview</div><div class="summary-grid">`;
+  FC_CONFIG.forEach(fc=>{
+    const rows=LOADED[fc.key]||[]; if(!rows.length) return;
+    const grades=rows.map(getGrade).filter(g=>g>0);
+    const a=avg(grades).toFixed(1);
+    const crit=grades.filter(g=>g>=4).length;
+    html+=`<div class="summary-card">
+      <div class="sc-icon">${fc.icon}</div>
+      <div class="sc-body"><div class="sc-name">${fc.label}</div><div class="sc-stats">${rows.length} assets · ${crit} critical</div></div>
+      <div class="sc-score" style="color:${gradeColor(a)}">${a}</div>
+    </div>`;
+  });
+  html+=`</div>`;
+
+  // Condition grade heatmap
+  html+=`<div class="section-title">Condition Grade Distribution Heatmap</div><div class="panel"><div class="heatmap" id="heatmap-grid"></div></div>`;
+  html+=`<div class="panel" style="border-left:3px solid var(--a1)"><div style="font-size:11px;color:var(--fog);line-height:1.8">
+    <strong style="color:var(--a1)">Grade Scale:</strong> 1 = Excellent · 2 = Good · 3 = Fair · 4 = Poor · 5 = Critical (SEQ WSUD inspection standard).
+    Grades are assigned during field inspection or UAV survey and drive maintenance scheduling and budget forecasting.
+  </div></div>`;
+
+  document.getElementById('tab-summary').innerHTML=html;
+
+  const hg=document.getElementById('heatmap-grid');
+  const bands=[[1,2],[2,3],[3,4],[4,5]];
+  let hdr=`<div class="hm-row"><div class="hm-label" style="font-size:8px;color:var(--a1)">Feature Class</div>`;
+  ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5'].forEach(l=>hdr+=`<div class="hm-cell" style="background:transparent;color:var(--dim);font-size:8px">${l}</div>`);
+  hdr+=`</div>`; hg.innerHTML=hdr;
+  FC_CONFIG.forEach(fc=>{
+    const rows=LOADED[fc.key]||[]; if(!rows.length) return;
+    const grades=rows.map(getGrade).filter(g=>g>0);
+    let row=`<div class="hm-row"><div class="hm-label">${fc.icon} ${fc.label}</div>`;
+    [1,2,3,4,5].forEach(gv=>{
+      const cnt=grades.filter(g=>Math.round(g)===gv).length;
+      const intensity=cnt/rows.length;
+      const bg=cnt===0?'#0d2218':`rgba(${gv<=2?'0,230,118':gv<=3?'255,179,0':'255,107,107'},${0.1+intensity*0.7})`;
+      row+=`<div class="hm-cell" style="background:${bg}">${cnt||''}</div>`;
+    });
+    row+=`</div>`; hg.innerHTML+=row;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 2 — MAINTENANCE PRIORITY
+// ══════════════════════════════════════════════════════════════════════════════
+function buildRenewal() {
+  const assets=[];
+  FC_CONFIG.forEach(fc=>{
+    (LOADED[fc.key]||[]).forEach(r=>{
+      const g=getGrade(r); if(g<=0) return;
+      const yr_c=parseInt(r[fc.yearField])||YEAR;
+      const age=YEAR-yr_c;
+      const overdueMaint = r.LastInspection && (YEAR-parseInt(r.LastInspection)) > (parseInt(r.MaintenanceCycle_months)||12)/12;
+      let priority = g>=4.5?'URGENT': g>=3.5?'HIGH': g>=2.5&&age>USEFUL_LIFE[fc.key]*0.7?'HIGH': g>=2.5?'MEDIUM': 'MONITOR';
+      if(priority==='MONITOR') return;
+      const maintenanceType = fc.key==='gpt'?'GPT Cleanout / Replacement':
+        fc.key==='bioretention'||fc.key==='raingarden'?'Filter Media / Vegetation Rehab':
+        fc.key==='wetland'?'Sediment Removal / Macrophyte Replanting':
+        fc.key==='swale'?'Vegetation Reinstatement / Regrading':
+        fc.key==='detention'?'Sediment Removal / Outlet Repair':
+        fc.key==='porpaving'?'Surface Vacuuming / Replacement': 'Inspect & Remediate';
+      assets.push({
+        WSUD_ID:r.WSUD_ID||r.AssetID||'—', fc:fc.label, icon:fc.icon, color:fc.color,
+        Suburb:r.Suburb||'—', Grade:g, Age:age, Priority:priority,
+        MaintenanceType:maintenanceType,
+        OverdueMaint:overdueMaint,
+        Cost:fmtAUD(parseFloat(r.EstimatedRemediation_AUD)||REPL_COST[fc.key]?.(r)||0),
+        VegHealth:r.VegetationHealth||'—', WQFail:r.TSS_MeetsTarget==='No'?'⚠ Yes':'—',
+      });
+    });
+  });
+  assets.sort((a,b)=>b.Grade-a.Grade);
+  const urgent=assets.filter(r=>r.Priority==='URGENT').length;
+  const high=assets.filter(r=>r.Priority==='HIGH').length;
+  const medium=assets.filter(r=>r.Priority==='MEDIUM').length;
+
+  let html=`<div class="kpi-strip">
+    <div class="kpi-card" style="--kc:#ff6b6b"><div class="kpi-label">Urgent</div><div class="kpi-value">${urgent}</div><div class="kpi-sub">Grade ≥ 4.5 — Act immediately</div></div>
+    <div class="kpi-card" style="--kc:#ff8a65"><div class="kpi-label">High Priority</div><div class="kpi-value">${high}</div><div class="kpi-sub">Grade ≥ 3.5 or aged</div></div>
+    <div class="kpi-card" style="--kc:#ffb300"><div class="kpi-label">Medium</div><div class="kpi-value">${medium}</div><div class="kpi-sub">Grade ≥ 2.5</div></div>
+    <div class="kpi-card" style="--kc:#00e676"><div class="kpi-label">Total Flagged</div><div class="kpi-value">${assets.length}</div><div class="kpi-sub">require maintenance</div></div>
+  </div>`;
+
+  html+=`<div class="section-title">Maintenance Priority Register</div>
+  <div class="toolbar">
+    <input class="search-input" placeholder="Search WSUD ID, suburb…" oninput="filterTable('maint-tbl',this.value)">
+    <select class="filter-sel" onchange="filterTableByCol('maint-tbl','Priority',this.value)">
+      <option value="">All Priorities</option><option>URGENT</option><option>HIGH</option><option>MEDIUM</option>
+    </select>
+    <select class="filter-sel" onchange="filterTableByCol('maint-tbl','Feature Class',this.value)">
+      <option value="">All Asset Types</option>
+      ${FC_CONFIG.map(fc=>`<option>${fc.label}</option>`).join('')}
+    </select>
+    <span class="count-label">${assets.length} assets flagged</span>
+  </div>
+  <div class="tbl-wrap"><table id="maint-tbl">
+  <thead><tr>
+    <th>#</th><th onclick="sortTable('maint-tbl',1)">WSUD ID</th>
+    <th onclick="sortTable('maint-tbl',2)">Feature Class</th>
+    <th onclick="sortTable('maint-tbl',3)">Suburb</th>
+    <th onclick="sortTable('maint-tbl',4)">Grade</th>
+    <th onclick="sortTable('maint-tbl',5)">Age (yr)</th>
+    <th>Recommended Action</th>
+    <th>WQ Failing</th>
+    <th>Veg Health</th>
+    <th>Est. Cost</th>
+    <th>Priority</th>
+  </tr></thead><tbody>`;
+
+  assets.forEach((a,i)=>{
+    html+=`<tr>
+      <td style="color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:9px">${i+1}</td>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${a.color}">${a.WSUD_ID}</span></td>
+      <td>${a.icon} ${a.fc}</td>
+      <td>${a.Suburb}</td>
+      <td>${gradeBadge(a.Grade)}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${a.Age}</td>
+      <td style="font-size:10px;color:var(--fog);max-width:200px">${a.MaintenanceType}</td>
+      <td style="color:${a.WQFail.includes('⚠')?'#ffb300':'#3a6045'};font-size:11px">${a.WQFail}</td>
+      <td style="font-size:10px;color:var(--fog)">${a.VegHealth}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--a4)">${a.Cost}</td>
+      <td>${priorityBadge(a.Priority)}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>
+  <div class="export-row"><button class="btn-export" onclick="exportTableCSV('maint-tbl','wsud_maintenance_priority.csv')">⬇ Export CSV</button></div>`;
+
+  document.getElementById('tab-renewal').innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 3 — WATER QUALITY PERFORMANCE
+// ══════════════════════════════════════════════════════════════════════════════
+function buildWQ() {
+  const all=getAll().filter(r=>r.TSS_MeetsTarget!==undefined||r.TP_MeetsTarget!==undefined);
+  const tssFail=all.filter(r=>r.TSS_MeetsTarget==='No').length;
+  const tssPass=all.filter(r=>r.TSS_MeetsTarget==='Yes').length;
+  const tpFail=all.filter(r=>r.TP_MeetsTarget==='No').length;
+  const tpPass=all.filter(r=>r.TP_MeetsTarget==='Yes').length;
+  const totalWQ=all.filter(r=>r.TSS_MeetsTarget).length;
+
+  let html=`<div class="kpi-strip">
+    <div class="kpi-card" style="--kc:#00e676"><div class="kpi-label">TSS Passing</div><div class="kpi-value">${tssPass}</div><div class="kpi-sub">meet design target</div></div>
+    <div class="kpi-card" style="--kc:#ff6b6b"><div class="kpi-label">TSS Failing</div><div class="kpi-value">${tssFail}</div><div class="kpi-sub">below TSS target</div></div>
+    <div class="kpi-card" style="--kc:#00e676"><div class="kpi-label">TP Passing</div><div class="kpi-value">${tpPass}</div><div class="kpi-sub">meet TP target</div></div>
+    <div class="kpi-card" style="--kc:#ff8a65"><div class="kpi-label">TP Failing</div><div class="kpi-value">${tpFail}</div><div class="kpi-sub">below TP target</div></div>
+    <div class="kpi-card" style="--kc:#29b6f6"><div class="kpi-label">WQ Compliance Rate</div><div class="kpi-value">${totalWQ?Math.round(tssPass/totalWQ*100):0}%</div><div class="kpi-sub">TSS target met</div></div>
+  </div>`;
+
+  // Per-class WQ breakdown
+  html+=`<div class="section-title">Water Quality Performance — By Treatment Type</div><div class="two-col">`;
+  FC_CONFIG.forEach(fc=>{
+    const rows=(LOADED[fc.key]||[]).filter(r=>r.TSS_MeetsTarget);
+    if(!rows.length) return;
+    const tssY=rows.filter(r=>r.TSS_MeetsTarget==='Yes').length;
+    const tssN=rows.filter(r=>r.TSS_MeetsTarget==='No').length;
+    const tpY=rows.filter(r=>r.TP_MeetsTarget==='Yes').length;
+    const tpN=rows.filter(r=>r.TP_MeetsTarget==='No').length;
+    const pct=Math.round(tssY/rows.length*100);
+    html+=`<div class="panel"><div class="panel-title">${fc.icon} ${fc.label}</div>
+      <div class="donut-wrap">
+        ${donutSVG([tssY,tssN],['#00e676','#ff6b6b'],80)}
+        <div class="donut-legend">
+          <div class="donut-item"><div class="donut-dot" style="background:#00e676"></div><div class="donut-label">TSS Target Met</div><div class="donut-val">${tssY}</div></div>
+          <div class="donut-item"><div class="donut-dot" style="background:#ff6b6b"></div><div class="donut-label">TSS Failing</div><div class="donut-val">${tssN}</div></div>
+          <div class="donut-item"><div class="donut-dot" style="background:#29b6f6"></div><div class="donut-label">TP Target Met</div><div class="donut-val">${tpY}</div></div>
+          <div style="margin-top:8px;font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:${pct>=75?'#00e676':pct>=50?'#ffb300':'#ff6b6b'}">${pct}% <span style="font-size:11px;color:var(--dim)">TSS compliant</span></div>
+        </div>
+      </div></div>`;
+  });
+  html+=`</div>`;
+
+  // WQ reduction performance table (assets with design targets)
+  const wqData=getAll().filter(r=>r.TSS_Reduction_pct);
+  if(wqData.length) {
+    html+=`<div class="section-title">Design Pollutant Reduction Targets</div>
+    <div class="tbl-wrap"><table id="wq-tbl">
+    <thead><tr>
+      <th onclick="sortTable('wq-tbl',0)">WSUD ID</th>
+      <th>Asset Type</th>
+      <th onclick="sortTable('wq-tbl',2)">Suburb</th>
+      <th onclick="sortTable('wq-tbl',3)">TSS Target %</th>
+      <th onclick="sortTable('wq-tbl',4)">TP Target %</th>
+      <th onclick="sortTable('wq-tbl',5)">TN Target %</th>
+      <th>TSS Meets Target</th>
+      <th>TP Meets Target</th>
+      <th>Condition Grade</th>
+    </tr></thead><tbody>`;
+    wqData.forEach(r=>{
+      const tss=parseFloat(r.TSS_Reduction_pct)||0;
+      const tp=parseFloat(r.TP_Reduction_pct)||0;
+      const tn=parseFloat(r.TN_Reduction_pct)||0;
+      html+=`<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${r._color}">${r.WSUD_ID||r.AssetID||'—'}</td>
+        <td>${r._icon} ${r._label}</td>
+        <td>${r.Suburb||'—'}</td>
+        <td><div class="mini-bar"><div class="bar-track"><div class="bar-fill" style="width:${tss}%;background:#00e676"></div></div><span style="font-size:10px;margin-left:4px">${tss}%</span></div></td>
+        <td><div class="mini-bar"><div class="bar-track"><div class="bar-fill" style="width:${tp}%;background:#29b6f6"></div></div><span style="font-size:10px;margin-left:4px">${tp}%</span></div></td>
+        <td><div class="mini-bar"><div class="bar-track"><div class="bar-fill" style="width:${tn}%;background:#ce93d8"></div></div><span style="font-size:10px;margin-left:4px">${tn||'—'}%</span></div></td>
+        <td>${r.TSS_MeetsTarget==='Yes'?'<span class="badge badge-pass">✓ Yes</span>':r.TSS_MeetsTarget==='No'?'<span class="badge badge-fail">✗ No</span>':'<span style="color:var(--dim)">—</span>'}</td>
+        <td>${r.TP_MeetsTarget==='Yes'?'<span class="badge badge-pass">✓ Yes</span>':r.TP_MeetsTarget==='No'?'<span class="badge badge-fail">✗ No</span>':'<span style="color:var(--dim)">—</span>'}</td>
+        <td>${gradeBadge(r.ConditionGrade)}</td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>
+    <div class="export-row"><button class="btn-export" onclick="exportTableCSV('wq-tbl','wsud_wq_performance.csv')">⬇ Export CSV</button></div>`;
+  }
+
+  html+=`<div class="panel" style="border-left:3px solid var(--a2)"><div style="font-size:11px;color:var(--fog);line-height:1.8">
+    <strong style="color:var(--a2)">Methodology:</strong> Water quality compliance is assessed against SEQ WSUD design targets for Total Suspended Solids (TSS), Total Phosphorus (TP) and Total Nitrogen (TN).
+    Targets are derived from the South East Queensland WSUD Design Guideline and LCC's Stormwater Quality Offset Framework.
+    Non-compliance triggers a maintenance intervention recommendation and offset status review.
+  </div></div>`;
+
+  document.getElementById('tab-wq').innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 4 — OFFSET COMPLIANCE
+// ══════════════════════════════════════════════════════════════════════════════
+function buildOffset() {
+  const all=getAll().filter(r=>r.OffsetStatus);
+  const active=all.filter(r=>r.OffsetStatus==='Active').length;
+  const completed=all.filter(r=>r.OffsetStatus==='Completed').length;
+  const pending=all.filter(r=>r.OffsetStatus==='Pending').length;
+  const lapsed=all.filter(r=>r.OffsetStatus==='Lapsed').length;
+
+  let html=`<div class="kpi-strip">
+    <div class="kpi-card" style="--kc:#ce93d8"><div class="kpi-label">Active Offsets</div><div class="kpi-value">${active}</div><div class="kpi-sub">currently obligated</div></div>
+    <div class="kpi-card" style="--kc:#00e676"><div class="kpi-label">Completed</div><div class="kpi-value">${completed}</div><div class="kpi-sub">obligations fulfilled</div></div>
+    <div class="kpi-card" style="--kc:#ffb300"><div class="kpi-label">Pending</div><div class="kpi-value">${pending}</div><div class="kpi-sub">awaiting confirmation</div></div>
+    <div class="kpi-card" style="--kc:#ff6b6b"><div class="kpi-label">Lapsed</div><div class="kpi-value">${lapsed}</div><div class="kpi-sub">require review</div></div>
+    <div class="kpi-card" style="--kc:#29b6f6"><div class="kpi-label">Compliance Rate</div><div class="kpi-value">${all.length?Math.round((active+completed)/all.length*100):0}%</div><div class="kpi-sub">active or fulfilled</div></div>
+  </div>`;
+
+  // Offset status breakdown by feature class
+  html+=`<div class="section-title">Offset Status by Treatment Class</div><div class="two-col">`;
+  FC_CONFIG.forEach(fc=>{
+    const rows=(LOADED[fc.key]||[]).filter(r=>r.OffsetStatus); if(!rows.length) return;
+    const cnts={Active:0,Completed:0,Pending:0,Lapsed:0};
+    rows.forEach(r=>cnts[r.OffsetStatus]=(cnts[r.OffsetStatus]||0)+1);
+    const colors=['#ce93d8','#00e676','#ffb300','#ff6b6b'];
+    const vals=Object.values(cnts);
+    html+=`<div class="panel"><div class="panel-title">${fc.icon} ${fc.label}</div>
+      <div class="donut-wrap">
+        ${donutSVG(vals,colors,80)}
+        <div class="donut-legend">
+          ${Object.entries(cnts).map(([k,v],i)=>`<div class="donut-item"><div class="donut-dot" style="background:${colors[i]}"></div><div class="donut-label">${k}</div><div class="donut-val">${v}</div></div>`).join('')}
+        </div>
+      </div></div>`;
+  });
+  html+=`</div>`;
+
+  // Lapsed offset register
+  const lapsedAssets=all.filter(r=>r.OffsetStatus==='Lapsed'||r.OffsetStatus==='Pending');
+  if(lapsedAssets.length) {
+    html+=`<div class="section-title">Lapsed &amp; Pending Offset Register — Action Required</div>
+    <div class="tbl-wrap"><table id="offset-tbl">
+    <thead><tr>
+      <th>WSUD ID</th><th>Feature Class</th><th>Suburb</th>
+      <th>TSS Meets Target</th><th>Condition Grade</th>
+      <th>Offset Status</th><th>Recommended Action</th>
+    </tr></thead><tbody>`;
+    lapsedAssets.forEach(r=>{
+      const action=r.OffsetStatus==='Lapsed'?'Urgent review — contact DA holder, assess replacement WSUD asset':
+        'Confirm with DA holder and update status — pending > 6 months requires escalation';
+      html+=`<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${r._color}">${r.WSUD_ID||'—'}</td>
+        <td>${r._icon} ${r._label}</td>
+        <td>${r.Suburb||'—'}</td>
+        <td>${r.TSS_MeetsTarget==='Yes'?'<span class="badge badge-pass">✓ Yes</span>':'<span class="badge badge-fail">✗ No</span>'}</td>
+        <td>${gradeBadge(r.ConditionGrade)}</td>
+        <td>${r.OffsetStatus==='Lapsed'?'<span class="badge badge-urgent">LAPSED</span>':'<span class="badge badge-warn">PENDING</span>'}</td>
+        <td style="font-size:10px;color:var(--fog);max-width:260px;white-space:normal">${action}</td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>
+    <div class="export-row"><button class="btn-export" onclick="exportTableCSV('offset-tbl','wsud_offset_register.csv')">⬇ Export CSV</button></div>`;
+  }
+
+  html+=`<div class="panel" style="border-left:3px solid var(--a5)"><div style="font-size:11px;color:var(--fog);line-height:1.8">
+    <strong style="color:var(--a5)">About WSUD Offsets:</strong> The Logan City Council Stormwater Quality Offset Framework allows development applicants to
+    meet stormwater quality obligations through financial contributions, works-in-kind or land dedication to Council-managed WSUD assets.
+    Active offsets represent ongoing obligations. Lapsed offsets require legal review and may require re-negotiation with the relevant development authority.
+  </div></div>`;
+
+  document.getElementById('tab-offset').innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 5 — BUDGET PLANNING
+// ══════════════════════════════════════════════════════════════════════════════
+function buildBudget() {
+  const SCENARIOS={
+    conservative:{label:'Conservative (Grade ≥ 4.5)', threshold:4.5, color:'#29b6f6'},
+    moderate:    {label:'Moderate (Grade ≥ 3.5)',      threshold:3.5, color:'#00e676'},
+    proactive:   {label:'Proactive (Grade ≥ 2.5)',     threshold:2.5, color:'#ffb300'},
+  };
+  const scenKeys=Object.keys(SCENARIOS);
+  const yrs=Array.from({length:10},(_,i)=>YEAR+i);
+
+  // Compute annual cost per scenario
+  const annualData={}, cumData={};
+  scenKeys.forEach(k=>{ annualData[k]={}; cumData[k]={}; let cum=0; yrs.forEach(y=>{ annualData[k][y]=0; }); });
+
+  getAll().forEach(r=>{
+    const g=getGrade(r); if(g<=0) return;
+    const yr_c=parseInt(r[FC_CONFIG.find(f=>f.key===r._fc)?.yearField]||r.YearConstructed||r.YearInstalled)||YEAR;
+    const usefulLife=USEFUL_LIFE[r._fc]||25;
+    const endLife=yr_c+usefulLife;
+    const cost=parseFloat(r.EstimatedRemediation_AUD)||REPL_COST[r._fc]?.(r)||0;
+    scenKeys.forEach(k=>{
+      const threshold=SCENARIOS[k].threshold;
+      // Project grade forward: linear degradation
+      yrs.forEach(y=>{
+        const futureAge=y-yr_c;
+        const projGrade=Math.min(5, g + (5-g)*(futureAge/(usefulLife*0.8)));
+        if(projGrade>=threshold && (annualData[k][y-1]===undefined || projGrade-(g+(5-g)*((y-1-yr_c)/(usefulLife*0.8)))<0.1)) {
+          annualData[k][y]=(annualData[k][y]||0)+cost;
+        }
+      });
+    });
+  });
+
+  // Cumulative
+  scenKeys.forEach(k=>{ let cum=0; yrs.forEach(y=>{ cum+=annualData[k][y]; cumData[k][y]=cum; }); });
+
+  let html=`<div class="section-title">10-Year WSUD Maintenance Budget Forecast</div>
+  <div class="scenario-bar">
+    ${scenKeys.map(k=>`<button class="scen-btn ${k===_activeScenario?'active':''}" onclick="_activeScenario='${k}';this.parentElement.querySelectorAll('.scen-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');rebuildBudgetBars('${k}')">${SCENARIOS[k].label}</button>`).join('')}
+  </div>
+  <div id="budget-bars"></div>`;
+
+  const maxVal=Math.max(...scenKeys.flatMap(k=>yrs.map(y=>annualData[k][y])));
+
+  html+=`<div class="section-title">Cumulative Funding Comparison — All Scenarios</div>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Year</th>
+    ${scenKeys.map(k=>`<th style="color:${SCENARIOS[k].color}">${SCENARIOS[k].label.split('(')[0].trim()} Annual</th><th style="color:${SCENARIOS[k].color}">Cumulative</th>`).join('')}
+  </tr></thead><tbody>`;
+  yrs.forEach(y=>{
+    html+=`<tr><td style="font-family:'JetBrains Mono',monospace;font-weight:600">${y}</td>`;
+    scenKeys.forEach(k=>{
+      html+=`<td style="font-family:'JetBrains Mono',monospace;color:${SCENARIOS[k].color}">${fmtAUD(annualData[k][y])}</td>
+             <td style="font-family:'JetBrains Mono',monospace;color:var(--dim)">${fmtAUD(cumData[k][y])}</td>`;
+    });
+    html+=`</tr>`;
+  });
+  html+=`</tbody></table></div>
+
+  <div class="panel" style="border-left:3px solid var(--a4)"><div style="font-size:11px;color:var(--fog);line-height:1.8">
+    <strong style="color:var(--a4)">Methodology:</strong> Remediation timing is projected using a linear degradation model based on current condition grade and remaining useful life (SEQ WSUD guidelines).
+    Three scenarios differ in the grade threshold triggering intervention: Conservative (≥4.5 = critical only), Moderate (≥3.5 = poor+critical), Proactive (≥2.5 = fair+).
+    Unit costs are WSUD-specific: bioretention filter media replacement ~$850/m², wetland works ~$420/m², GPT replacement $15k–$75k depending on class.
+    These estimates support operational budget planning and risk/opportunity communication to management.
+  </div></div>`;
+
+  document.getElementById('tab-budget').innerHTML=html;
+  rebuildBudgetBars(_activeScenario);
+
+  function rebuildBudgetBars(scenario) {
+    const s=SCENARIOS[scenario];
+    const barsEl=document.getElementById('budget-bars');
+    if(!barsEl) return;
+    const maxV=Math.max(...yrs.map(y=>annualData[scenario][y]||0))||1;
+    let bHtml=`<div class="panel"><div class="panel-title">${s.label} — Annual Cost Profile</div>`;
+    yrs.forEach(y=>{
+      const v=annualData[scenario][y]||0;
+      const pct=v/maxV*100;
+      bHtml+=`<div class="yr-bar-wrap">
+        <div class="yr-bar-label">${y}</div>
+        <div class="yr-bar-track"><div class="yr-bar-fill" style="width:${pct}%;background:${s.color};opacity:.8"></div></div>
+        <div class="yr-bar-meta">${fmtAUD(v)} · cum ${fmtAUD(cumData[scenario][y]||0)}</div>
+      </div>`;
+    });
+    bHtml+=`</div>`;
+    barsEl.innerHTML=bHtml;
+  }
+
+  // Override global so button calls work after re-render
+  window.rebuildBudgetBars = rebuildBudgetBars;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 6 — DATA QUALITY
+// ══════════════════════════════════════════════════════════════════════════════
+function buildQuality() {
+  const issues=[];
+  const qualityChecks=FC_CONFIG.map(fc=>{
+    const rows=LOADED[fc.key]||[]; if(!rows.length) return null;
+    let missing=0,logical=0,outliers=0;
+    rows.forEach(r=>{
+      if(!r.WSUD_ID||r.WSUD_ID==='') { missing++; issues.push({fc:fc.label,id:'?',field:'WSUD_ID',type:'Missing ID',val:'',action:'All WSUD assets must have a unique identifier.',sev:'HIGH'}); }
+      const g=parseFloat(r.ConditionGrade);
+      if(isNaN(g)||g<1||g>5) { outliers++; issues.push({fc:fc.label,id:r.WSUD_ID||'?',field:'ConditionGrade',type:'Out of Range',val:r.ConditionGrade,action:'Condition grade must be 1–5 per SEQ inspection standard.',sev:'HIGH'}); }
+      const yr_c=parseInt(r.YearConstructed||r.YearInstalled);
+      if(yr_c&&yr_c>YEAR) { logical++; issues.push({fc:fc.label,id:r.WSUD_ID||'?',field:'YearConstructed',type:'Future Date',val:yr_c,action:'Construction year is in the future — verify data entry.',sev:'HIGH'}); }
+      if(r.LastInspection&&yr_c&&parseInt(r.LastInspection)<yr_c) { logical++; issues.push({fc:fc.label,id:r.WSUD_ID||'?',field:'LastInspection',type:'Logical Error',val:r.LastInspection,action:'Inspection date predates construction — verify.',sev:'HIGH'}); }
+      if(fc.key==='bioretention'&&parseFloat(r.FilterArea_m2)>2000) { outliers++; issues.push({fc:fc.label,id:r.WSUD_ID||'?',field:'FilterArea_m2',type:'Outlier',val:r.FilterArea_m2,action:'Filter area >2000m² is unusually large — confirm or split record.',sev:'LOW'}); }
+      if(fc.key==='gpt'&&r.LastCleanout&&parseInt(r.LastCleanout)<2015) issues.push({fc:fc.label,id:r.WSUD_ID||'?',field:'LastCleanout',type:'Overdue Maintenance',val:r.LastCleanout,action:'GPT last cleanout >10 years ago — schedule urgent inspection.',sev:'MEDIUM'});
+      if(fc.key==='wetland'&&parseFloat(r.HydraulicRetTime_days)<1) { outliers++; issues.push({fc:fc.label,id:r.WSUD_ID||'?',field:'HydraulicRetTime_days',type:'Below Minimum',val:r.HydraulicRetTime_days,action:'Hydraulic retention time <1 day — verify design parameter.',sev:'MEDIUM'}); }
+    });
+    return {fc:fc.label,icon:fc.icon,color:fc.color,total:rows.length,missing,logical,outliers,score:Math.max(0,100-missing*10-logical*8-outliers*5)};
+  }).filter(Boolean);
+
+  const totalIssues=issues.length;
+  const hiIssues=issues.filter(i=>i.sev==='HIGH').length;
+  const avgQuality=Math.round(avg(qualityChecks.map(q=>q.score)));
+
+  let html=`<div class="kpi-strip">
+    <div class="kpi-card" style="--kc:${avgQuality>80?'#00e676':avgQuality>60?'#ffb300':'#ff6b6b'}"><div class="kpi-label">Overall Data Quality</div><div class="kpi-value">${avgQuality}%</div><div class="kpi-sub">portfolio average</div></div>
+    <div class="kpi-card" style="--kc:#ff6b6b"><div class="kpi-label">Total Issues</div><div class="kpi-value">${totalIssues}</div><div class="kpi-sub">across all classes</div></div>
+    <div class="kpi-card" style="--kc:#ff8a65"><div class="kpi-label">High Severity</div><div class="kpi-value">${hiIssues}</div><div class="kpi-sub">require immediate fix</div></div>
+    <div class="kpi-card" style="--kc:#00e676"><div class="kpi-label">Clean Records</div><div class="kpi-value">${getAll().length-Math.min(getAll().length,totalIssues)}</div><div class="kpi-sub">no issues detected</div></div>
+  </div>`;
+
+  // Per-class quality scores
+  html+=`<div class="section-title">Data Quality Scores — By Feature Class</div>
+  <div class="tbl-wrap"><table>
+  <thead><tr>
+    <th>Feature Class</th><th>Total Records</th><th>Missing IDs</th>
+    <th>Logical Errors</th><th>Outliers</th><th>Quality Score</th>
+  </tr></thead><tbody>`;
+  qualityChecks.forEach(q=>{
+    const c=q.score>80?'#00e676':q.score>60?'#ffb300':'#ff6b6b';
+    html+=`<tr>
+      <td style="color:${q.color};font-weight:600">${q.icon} ${q.fc}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${q.total}</td>
+      <td style="color:${q.missing>0?'#ff6b6b':'#3a6045'};font-family:'JetBrains Mono',monospace">${q.missing||'—'}</td>
+      <td style="color:${q.logical>0?'#ffb300':'#3a6045'};font-family:'JetBrains Mono',monospace">${q.logical||'—'}</td>
+      <td style="color:${q.outliers>0?'#ffb300':'#3a6045'};font-family:'JetBrains Mono',monospace">${q.outliers||'—'}</td>
+      <td><div class="mini-bar">
+        <div class="bar-track"><div class="bar-fill" style="width:${q.score}%;background:${c}"></div></div>
+        <span style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:${c};margin-left:8px">${q.score}%</span>
+      </div></td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+
+  // Issue register
+  if(issues.length) {
+    html+=`<div class="section-title">Issue Register</div>
+    <div class="toolbar">
+      <select class="filter-sel" onchange="filterTableByCol('issue-tbl','Severity',this.value)">
+        <option value="">All Severities</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+      </select>
+      <span class="count-label">${issues.length} issues found</span>
+    </div>
+    <div class="tbl-wrap"><table id="issue-tbl">
+    <thead><tr><th>#</th><th>Feature Class</th><th>Asset ID</th><th>Field</th><th>Issue Type</th><th>Value</th><th>Recommended Action</th><th>Severity</th></tr></thead>
+    <tbody>`;
+    issues.forEach((iss,i)=>{
+      const sevBadge=iss.sev==='HIGH'?'<span class="badge badge-urgent">HIGH</span>':iss.sev==='MEDIUM'?'<span class="badge badge-warn">MEDIUM</span>':'<span class="badge badge-monitor">LOW</span>';
+      html+=`<tr>
+        <td style="color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:9px">${i+1}</td>
+        <td style="font-size:10px">${iss.fc}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--a1)">${iss.id}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--a4)">${iss.field}</td>
+        <td style="font-size:11px">${iss.type}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim)">${iss.val||'—'}</td>
+        <td style="font-size:10px;color:var(--fog);max-width:240px;white-space:normal">${iss.action}</td>
+        <td>${sevBadge}</td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>
+    <div class="export-row"><button class="btn-export" onclick="exportTableCSV('issue-tbl','wsud_data_quality.csv')">⬇ Export CSV</button></div>`;
+  }
+
+  document.getElementById('tab-quality').innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 7 — ASSET MAP
+// ══════════════════════════════════════════════════════════════════════════════
+function buildMap() {
+  const panel=document.getElementById('tab-map');
+  if(_leafletMap){ refreshMapMarkers(); return; }
+  panel.innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+      <select class="filter-sel" id="map-fc" onchange="refreshMapMarkers()">
+        <option value="">All Treatment Types</option>
+        ${FC_CONFIG.filter(fc=>LOADED[fc.key]?.length).map(fc=>`<option value="${fc.key}">${fc.icon} ${fc.label}</option>`).join('')}
+      </select>
+      <select class="filter-sel" id="map-cond" onchange="refreshMapMarkers()">
+        <option value="">All Conditions</option>
+        <option value="critical">🔴 Poor/Critical (≥ 4)</option>
+        <option value="watch">🟡 Fair (2.5–4)</option>
+        <option value="good">🟢 Good/Excellent (< 2.5)</option>
+      </select>
+      <select class="filter-sel" id="map-offset" onchange="refreshMapMarkers()">
+        <option value="">All Offset Status</option>
+        <option value="Active">Active Offset</option><option value="Lapsed">Lapsed</option><option value="Pending">Pending</option>
+      </select>
+      <span class="count-label" id="map-count"></span>
+    </div>
+    <div class="map-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#ff6b6b"></div>Poor/Critical (≥ 4)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ffb300"></div>Fair (2.5–4)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#00e676"></div>Good/Excellent (< 2.5)</div>
+      <div style="width:1px;background:var(--line)"></div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(255,255,255,.6);border:2px solid #94a3b8"></div>Point (GPT/RainGarden)</div>
+      <div class="legend-item"><div class="legend-sq" style="background:rgba(0,230,118,.15);border:2px solid #94a3b8"></div>Polygon (Basin/Wetland)</div>
+      <div class="legend-item"><div class="legend-line" style="background:#94a3b8"></div>Polyline (Swale)</div>
+    </div>
+    <div id="asset-map"></div>
+    <div class="panel" style="margin-top:12px;border-left:3px solid var(--a2)">
+      <div style="font-size:11px;color:var(--fog);line-height:1.7">
+        <strong style="color:var(--a2)">Note on geometry:</strong>
+        Coordinates are synthetically placed within the Logan LGA bounding box (lat -27.58 to -27.78, lng 152.98 to 153.22).
+        In production, real GIS geometry from LCC's WSUD asset register would display assets at their true cadastral locations.
+        Geometry types follow the WSUD schema — basins and wetlands are <strong style="color:#00e676">Polygon</strong>,
+        swales are <strong style="color:#b9f6ca">Polyline</strong>, GPTs and rain gardens are <strong style="color:#29b6f6">Point</strong>.
+        Click any marker for full asset details including condition grade, offset status and WQ compliance.
+      </div>
+    </div>`;
+
+  _leafletMap=L.map('asset-map',{zoomControl:true}).setView([-27.67,153.10],11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:19}).addTo(_leafletMap);
+  refreshMapMarkers();
+}
+
+function refreshMapMarkers() {
+  if(!_leafletMap) return;
+  _leafletMap.eachLayer(l=>{ if(l instanceof L.CircleMarker||l instanceof L.Marker) _leafletMap.removeLayer(l); });
+  const fcF=document.getElementById('map-fc')?.value||'';
+  const condF=document.getElementById('map-cond')?.value||'';
+  const offF=document.getElementById('map-offset')?.value||'';
+  let count=0;
+
+  FC_CONFIG.forEach(fc=>{
+    if(fcF&&fc.key!==fcF) return;
+    (LOADED[fc.key]||[]).forEach(r=>{
+      const lat=parseFloat(r.Latitude),lng=parseFloat(r.Longitude);
+      if(isNaN(lat)||isNaN(lng)) return;
+      const g=getGrade(r);
+      const band=g>=4?'critical':g>=2.5?'watch':'good';
+      if(condF&&band!==condF) return;
+      if(offF&&r.OffsetStatus!==offF) return;
+      const clr=g>=4?'#ff6b6b':g>=2.5?'#ffb300':'#00e676';
+      const name=r.WSUD_ID||r.AssetID||'—';
+      const yr_c=r.YearConstructed||r.YearInstalled||'—';
+      const popup=`<div style="font-family:'Instrument Sans',sans-serif;font-size:12px;min-width:200px;line-height:1.6">
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px">${fc.icon} ${name}</div>
+        <div style="color:#666;font-size:11px;margin-bottom:6px">${fc.label} · ${r.Suburb||'—'}</div>
+        <div style="border-top:1px solid #eee;padding-top:6px">
+          <div>Condition Grade: <strong style="color:${clr}">${g}/5</strong></div>
+          <div>Offset Status: <strong>${r.OffsetStatus||'—'}</strong></div>
+          <div>TSS Target: <strong style="color:${r.TSS_MeetsTarget==='Yes'?'#00c853':'#ff5252'}">${r.TSS_MeetsTarget||'—'}</strong></div>
+          <div>Year: ${yr_c}</div>
+          <div>Useful Life: <strong>${USEFUL_LIFE[fc.key]} yrs</strong></div>
+        </div>
+      </div>`;
+      const geom=r.GeometryType||fc.geomType;
+      let marker;
+      if(geom==='Point') marker=L.circleMarker([lat,lng],{radius:8,color:clr,fillColor:clr,fillOpacity:0.85,weight:2});
+      else if(geom==='Polyline') marker=L.circleMarker([lat,lng],{radius:7,color:clr,fillColor:'#050f0a',fillOpacity:0.9,weight:2.5,dashArray:'3,2'});
+      else marker=L.circleMarker([lat,lng],{radius:11,color:clr,fillColor:clr,fillOpacity:0.35,weight:2});
+      marker.bindPopup(popup).addTo(_leafletMap);
+      count++;
+    });
+  });
+  const el=document.getElementById('map-count');
+  if(el) el.textContent=`${count} assets shown`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 8 — CATCHMENT ANALYSIS
+// ══════════════════════════════════════════════════════════════════════════════
+function buildCatchment() {
+  // Aggregate catchment area and impervious load by suburb
+  const all=getAll().filter(r=>r.CatchmentArea_ha&&parseFloat(r.CatchmentArea_ha)>0);
+  const bySuburb={};
+  all.forEach(r=>{
+    const s=r.Suburb||'Unknown';
+    if(!bySuburb[s]) bySuburb[s]={suburb:s,assets:0,totalCatchment_ha:0,tssPass:0,tssTotal:0,grades:[]};
+    bySuburb[s].assets++;
+    bySuburb[s].totalCatchment_ha+=parseFloat(r.CatchmentArea_ha)||0;
+    if(r.TSS_MeetsTarget) { bySuburb[s].tssTotal++; if(r.TSS_MeetsTarget==='Yes') bySuburb[s].tssPass++; }
+    bySuburb[s].grades.push(getGrade(r));
+  });
+
+  const suburbRows=Object.values(bySuburb)
+    .map(s=>({...s,avgGrade:avg(s.grades).toFixed(1),wqCompliancePct:s.tssTotal?Math.round(s.tssPass/s.tssTotal*100):null}))
+    .sort((a,b)=>parseFloat(b.avgGrade)-parseFloat(a.avgGrade));
+
+  const totalCatchment=suburbRows.reduce((s,r)=>s+r.totalCatchment_ha,0);
+
+  let html=`<div class="kpi-strip">
+    <div class="kpi-card" style="--kc:#00e676"><div class="kpi-label">Total Catchment Served</div><div class="kpi-value">${totalCatchment.toFixed(0)} ha</div><div class="kpi-sub">across WSUD portfolio</div></div>
+    <div class="kpi-card" style="--kc:#29b6f6"><div class="kpi-label">Suburbs Covered</div><div class="kpi-value">${suburbRows.length}</div><div class="kpi-sub">with WSUD treatment</div></div>
+    <div class="kpi-card" style="--kc:#ffb300"><div class="kpi-label">Avg WQ Compliance</div><div class="kpi-value">${Math.round(avg(suburbRows.filter(r=>r.wqCompliancePct!==null).map(r=>r.wqCompliancePct)))||0}%</div><div class="kpi-sub">TSS targets met</div></div>
+    <div class="kpi-card" style="--kc:#ff8a65"><div class="kpi-label">Avg Assets/Suburb</div><div class="kpi-value">${suburbRows.length?(suburbRows.reduce((s,r)=>s+r.assets,0)/suburbRows.length).toFixed(1):'—'}</div><div class="kpi-sub">WSUD coverage density</div></div>
+  </div>`;
+
+  html+=`<div class="section-title">Catchment Coverage &amp; WQ Performance — By Suburb</div>
+  <div class="toolbar">
+    <input class="search-input" placeholder="Filter suburb…" oninput="filterTable('catch-tbl',this.value)">
+    <span class="count-label">${suburbRows.length} suburbs</span>
+  </div>
+  <div class="tbl-wrap"><table id="catch-tbl">
+  <thead><tr>
+    <th onclick="sortTable('catch-tbl',0)">Suburb</th>
+    <th onclick="sortTable('catch-tbl',1)">WSUD Assets</th>
+    <th onclick="sortTable('catch-tbl',2)">Catchment Area (ha)</th>
+    <th onclick="sortTable('catch-tbl',3)">Avg Condition Grade</th>
+    <th onclick="sortTable('catch-tbl',4)">WQ Compliance %</th>
+    <th>Catchment Share</th>
+    <th>Risk Indicator</th>
+  </tr></thead><tbody>`;
+
+  suburbRows.forEach(r=>{
+    const riskColor=parseFloat(r.avgGrade)>=4?'#ff6b6b':parseFloat(r.avgGrade)>=3?'#ffb300':'#00e676';
+    const riskLabel=parseFloat(r.avgGrade)>=4?'<span class="badge badge-urgent">HIGH RISK</span>':parseFloat(r.avgGrade)>=3?'<span class="badge badge-warn">MODERATE</span>':'<span class="badge badge-ok">LOW</span>';
+    const sharePct=Math.round(r.totalCatchment_ha/totalCatchment*100);
+    html+=`<tr>
+      <td style="font-weight:600">${r.suburb}</td>
+      <td style="font-family:'JetBrains Mono',monospace;text-align:right">${r.assets}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${r.totalCatchment_ha.toFixed(1)}</td>
+      <td>${gradeBadge(r.avgGrade)}</td>
+      <td style="font-family:'JetBrains Mono',monospace;color:${r.wqCompliancePct!==null?(r.wqCompliancePct>=75?'#00e676':r.wqCompliancePct>=50?'#ffb300':'#ff6b6b'):'var(--dim)'}">${r.wqCompliancePct!==null?r.wqCompliancePct+'%':'—'}</td>
+      <td><div class="mini-bar"><div class="bar-track"><div class="bar-fill" style="width:${sharePct}%;background:var(--a2)"></div></div><span style="font-size:10px;margin-left:4px">${sharePct}%</span></div></td>
+      <td>${riskLabel}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>
+  <div class="export-row"><button class="btn-export" onclick="exportTableCSV('catch-tbl','wsud_catchment_analysis.csv')">⬇ Export CSV</button></div>`;
+
+  // Treatment type breakdown
+  html+=`<div class="section-title">Catchment Coverage — By Treatment Type</div><div class="two-col">`;
+  FC_CONFIG.forEach(fc=>{
+    const rows=(LOADED[fc.key]||[]).filter(r=>r.CatchmentArea_ha&&parseFloat(r.CatchmentArea_ha)>0); if(!rows.length) return;
+    const totalCatch=rows.reduce((s,r)=>s+(parseFloat(r.CatchmentArea_ha)||0),0);
+    const avgCatch=(totalCatch/rows.length).toFixed(1);
+    html+=`<div class="panel"><div class="panel-title">${fc.icon} ${fc.label}</div>
+      <div style="display:flex;gap:20px;align-items:center">
+        <div style="text-align:center">
+          <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:${fc.color}">${totalCatch.toFixed(0)}</div>
+          <div style="font-size:10px;color:var(--dim)">ha total catchment</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--fog)">${avgCatch}</div>
+          <div style="font-size:10px;color:var(--dim)">ha avg per asset</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--a1)">${rows.length}</div>
+          <div style="font-size:10px;color:var(--dim)">assets</div>
+        </div>
+      </div></div>`;
+  });
+  html+=`</div>`;
+
+  document.getElementById('tab-catchment').innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 9 — BROWSE
+// ══════════════════════════════════════════════════════════════════════════════
+function buildBrowse() {
+  let activeFc=FC_CONFIG.find(fc=>LOADED[fc.key]?.length)?.key||'';
+  const tabs=FC_CONFIG.filter(fc=>LOADED[fc.key]?.length);
+
+  let html=`<div class="scenario-bar">
+    ${tabs.map(fc=>`<button class="scen-btn ${fc.key===activeFc?'active':''}" onclick="showBrowseTable('${fc.key}',this)">${fc.icon} ${fc.label} (${LOADED[fc.key].length})</button>`).join('')}
+  </div><div id="browse-content"></div>`;
+
+  document.getElementById('tab-browse').innerHTML=html;
+  if(activeFc) showBrowseTable(activeFc, document.querySelector('#tab-browse .scen-btn'));
+}
+
+function showBrowseTable(key, btn) {
+  document.querySelectorAll('#tab-browse .scen-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const rows=LOADED[key]||[];
+  const fc=FC_CONFIG.find(f=>f.key===key);
+  if(!rows.length) return;
+  const cols=Object.keys(rows[0]).filter(c=>c!=='_fc'&&c!=='_label'&&c!=='_icon'&&c!=='_color');
+
+  let html=`<div class="toolbar">
+    <input class="search-input" placeholder="Search…" oninput="filterTable('browse-tbl',this.value)">
+    <span class="count-label">${rows.length} records — ${fc?.label}</span>
+  </div>
+  <div class="tbl-wrap"><table id="browse-tbl">
+  <thead><tr>${cols.map((c,i)=>`<th onclick="sortTable('browse-tbl',${i})">${c}</th>`).join('')}</tr></thead>
+  <tbody>`;
+
+  rows.forEach(r=>{
+    html+=`<tr>${cols.map(c=>{
+      const v=r[c]??'';
+      if(c==='ConditionGrade') return `<td>${gradeBadge(v)}</td>`;
+      if(c==='TSS_MeetsTarget'||c==='TP_MeetsTarget') return `<td>${v==='Yes'?'<span class="badge badge-pass">✓ Yes</span>':v==='No'?'<span class="badge badge-fail">✗ No</span>':'<span style="color:var(--dim)">—</span>'}</td>`;
+      if(c==='OffsetStatus') return `<td><span class="badge badge-${v==='Active'?'monitor':v==='Completed'?'ok':v==='Lapsed'?'urgent':'warn'}">${v||'—'}</span></td>`;
+      if(c==='WSUD_ID') return `<td><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${fc?.color}">${v}</span></td>`;
+      return `<td style="font-size:11px">${v}</td>`;
+    }).join('')}</tr>`;
+  });
+
+  html+=`</tbody></table></div>
+  <div class="export-row"><button class="btn-export" onclick="exportTableCSV('browse-tbl','wsud_${key}_data.csv')">⬇ Export ${fc?.label} CSV</button></div>`;
+  document.getElementById('browse-content').innerHTML=html;
+}
+
+// ── TAB SWITCH ─────────────────────────────────────────────────────────────
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='browse') buildBrowse();
+  if(id==='map') { buildMap(); setTimeout(()=>{ if(_leafletMap) _leafletMap.invalidateSize(); },200); }
+  if(id==='budget') buildBudget();
+}
+
+function showToast(msg) {
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+buildUploadGrid();
+</script>
+</body>
+</html>

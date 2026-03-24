@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WSUD Asset Management Schema — LCC</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #050f0a;
+    --surface: #091a10;
+    --surface2: #0d2218;
+    --border: #163322;
+    --accent1: #00e676;
+    --accent2: #69f0ae;
+    --accent3: #b9f6ca;
+    --accent4: #00c853;
+    --accent5: #1b5e20;
+    --accent6: #43a047;
+    --warn: #ff6b6b;
+    --amber: #ffb300;
+    --blue: #29b6f6;
+    --text: #d8f0e0;
+    --muted: #4a7a5a;
+    --tag-bg: rgba(0,230,118,0.07);
+    --tag-border: rgba(0,230,118,0.22);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(ellipse at 15% 85%, rgba(0,100,30,0.10) 0%, transparent 60%),
+      radial-gradient(ellipse at 85% 15%, rgba(0,230,118,0.06) 0%, transparent 50%),
+      linear-gradient(rgba(0,230,118,0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,230,118,0.018) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 44px;
+  }
+  .header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,230,118,0.08);
+    border: 1px solid rgba(0,230,118,0.2);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent1);
+    margin-bottom: 14px;
+  }
+  .header-badge::before { content: '🌿'; font-size: 12px; }
+  header h1 {
+    font-size: clamp(26px, 4vw, 50px);
+    font-weight: 300;
+    color: #fff;
+    letter-spacing: -1px;
+    line-height: 1.1;
+  }
+  header h1 span { color: var(--accent1); font-weight: 600; }
+  header p {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 680px;
+    margin-inline: auto;
+    line-height: 1.6;
+  }
+
+  /* Stats */
+  .stats-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 30px;
+    justify-content: center;
+  }
+  .stat-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 40px;
+    padding: 7px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stat-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent1);
+    line-height: 1;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); }
+
+  /* Arch overview */
+  .arch-overview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 30px;
+  }
+  .arch-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .arch-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .arch-tier {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    min-width: 120px;
+  }
+  .arch-tier-label {
+    font-size: 9px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .arch-tier-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 6px 12px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    width: 100%;
+  }
+  .arch-tier-root {
+    border-color: var(--accent1);
+    color: var(--accent1);
+    font-weight: 700;
+    font-size: 13px;
+    box-shadow: 0 0 20px rgba(0,230,118,0.12);
+  }
+  .arch-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--muted);
+    font-size: 16px;
+    padding: 0 6px;
+    padding-top: 22px;
+  }
+
+  /* Schema grid */
+  .schema-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 14px;
+  }
+  .span2 { grid-column: span 2; }
+
+  /* Card */
+  .fc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  }
+  .fc-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    border-color: var(--cls-color, var(--accent1));
+  }
+
+  .fc-header {
+    padding: 13px 15px 11px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .fc-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0;
+    background: color-mix(in srgb, var(--cls-color, #00e676) 15%, transparent);
+  }
+  .fc-title-group { flex: 1; min-width: 0; }
+  .fc-class-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    color: var(--cls-color, var(--accent1));
+  }
+  .fc-title { font-size: 14px; font-weight: 600; color: #fff; }
+  .fc-badge {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 2px 7px;
+    border-radius: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    background: color-mix(in srgb, var(--cls-color, #00e676) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--cls-color, #00e676) 28%, transparent);
+    color: var(--cls-color, var(--accent1));
+  }
+
+  .fc-body { padding: 12px 15px; }
+  .fc-desc { font-size: 12px; color: var(--muted); margin-bottom: 11px; line-height: 1.5; }
+
+  .feature-group { margin-bottom: 11px; }
+  .feature-group:last-child { margin-bottom: 0; }
+  .feature-group-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 5px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .feature-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    margin-bottom: 3px;
+    font-size: 12px;
+  }
+  .feature-name { color: var(--text); font-weight: 500; flex-shrink: 0; min-width: 160px; }
+  .feature-type { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); flex-shrink: 0; }
+  .feature-mandatory { font-size: 10px; color: var(--warn); margin-left: auto; font-weight: 700; flex-shrink: 0; }
+  .feature-mandatory.opt { color: var(--muted); font-weight: 400; }
+
+  .enum-wrap { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; margin-bottom: 4px; }
+  .enum-tag {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    color: var(--accent2);
+  }
+
+  .sub-feature {
+    margin-left: 12px;
+    padding-left: 10px;
+    border-left: 2px solid var(--border);
+    margin-top: 3px;
+  }
+  .sub-feature .feature-row { font-size: 11px; }
+  .sub-feature .feature-name { min-width: 140px; color: var(--muted); }
+
+  .geom-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 3px 8px;
+    background: rgba(0,230,118,0.07);
+    border: 1px solid rgba(0,230,118,0.18);
+    border-radius: 6px;
+    color: var(--accent3);
+    margin-top: 7px;
+  }
+
+  .fc-toggle {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 7px;
+    background: var(--surface2);
+    font-size: 10px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+    border-top: 1px solid var(--border);
+  }
+  .fc-toggle:hover { color: var(--accent1); background: rgba(0,230,118,0.05); }
+  .fc-details { display: none; padding: 12px 15px; border-top: 1px solid var(--border); }
+  .fc-details.open { display: block; }
+
+  .scrollable { max-height: 320px; overflow-y: auto; padding-right: 4px; }
+  .scrollable::-webkit-scrollbar { width: 3px; }
+  .scrollable::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .subtype-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 9px;
+    margin-top: 10px;
+  }
+  .subtype-panel {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .subtype-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent1);
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mt-4 { margin-top: 4px; }
+
+  /* Legend */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    justify-content: center;
+    margin-top: 30px; margin-bottom: 10px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+  .legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink:0; }
+
+  footer {
+    text-align: center;
+    margin-top: 50px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+  footer span { color: var(--accent1); }
+
+  /* Section divider */
+  .section-divider {
+    grid-column: 1 / -1;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 0 4px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-divider::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  /* Color themes per feature class */
+  .t-bio    { --cls-color: #00e676; }
+  .t-swale  { --cls-color: #69f0ae; }
+  .t-wet    { --cls-color: #b9f6ca; }
+  .t-det    { --cls-color: #40c057; }
+  .t-rain   { --cls-color: #29b6f6; }
+  .t-sed    { --cls-color: #81d4fa; }
+  .t-gpt    { --cls-color: #4fc3f7; }
+  .t-perv   { --cls-color: #a5d6a7; }
+  .t-offset { --cls-color: #ffb300; }
+  .t-inspect { --cls-color: #ff8a65; }
+  .t-maint  { --cls-color: #ce93d8; }
+  .t-catchm { --cls-color: #80cbc4; }
+  .t-wq     { --cls-color: #f48fb1; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="header-badge">LCC Asset Data Model — WSUD</div>
+    <h1>WSUD Asset <span>Management Schema</span></h1>
+    <p>Water Sensitive Urban Design asset data architecture — bioretention, swales, wetlands, detention basins, stormwater quality offsets, inspection and maintenance records. Aligned to SEQ WSUD guidelines and LCC ADAC standards.</p>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat-pill"><span class="stat-num">13</span><span class="stat-label">Feature Classes</span></div>
+    <div class="stat-pill"><span class="stat-num">22</span><span class="stat-label">Sub-features</span></div>
+    <div class="stat-pill"><span class="stat-num">180+</span><span class="stat-label">Attributes</span></div>
+    <div class="stat-pill"><span class="stat-num">250+</span><span class="stat-label">Enum Values</span></div>
+    <div class="stat-pill"><span class="stat-num">4</span><span class="stat-label">Geometry Types</span></div>
+    <div class="stat-pill"><span class="stat-num">SEQ</span><span class="stat-label">WSUD Compliant</span></div>
+  </div>
+
+  <!-- Architecture Overview -->
+  <div class="arch-overview">
+    <div class="arch-title">▸ Schema Hierarchy — Whole-of-Life WSUD Asset Management</div>
+    <div class="arch-flow">
+      <div class="arch-tier">
+        <div class="arch-tier-label">Asset Domain</div>
+        <div class="arch-tier-box arch-tier-root">WSUD</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Treatment Class</div>
+        <div class="arch-tier-box">Bioretention</div>
+        <div class="arch-tier-box">Constructed Wetland</div>
+        <div class="arch-tier-box">Swale / Buffer</div>
+        <div class="arch-tier-box">Detention Basin</div>
+        <div class="arch-tier-box">GPT / Sediment</div>
+        <div class="arch-tier-box">+ 8 more…</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Feature / Sub-type</div>
+        <div class="arch-tier-box">Basin (online/offline)</div>
+        <div class="arch-tier-box">Swale (grassed/veg.)</div>
+        <div class="arch-tier-box">Wetland (macro/open)</div>
+        <div class="arch-tier-box">GPT (complex/simple)</div>
+        <div class="arch-tier-box">Porous Paving</div>
+        <div class="arch-tier-box">Rain Garden</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Asset Lifecycle</div>
+        <div class="arch-tier-box">Design Parameters</div>
+        <div class="arch-tier-box">Condition Score</div>
+        <div class="arch-tier-box">Inspection Record</div>
+        <div class="arch-tier-box">Maintenance Activity</div>
+        <div class="arch-tier-box">WQ Performance</div>
+        <div class="arch-tier-box">Offset Tracking</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Enumeration / GIS</div>
+        <div class="arch-tier-box" style="font-size:10px">TreatmentMeasure</div>
+        <div class="arch-tier-box" style="font-size:10px">ConditionGrade 1–5</div>
+        <div class="arch-tier-box" style="font-size:10px">TSS / TP / TN loads</div>
+        <div class="arch-tier-box" style="font-size:10px">Point / Line / Polygon</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid -->
+  <div class="schema-grid">
+
+    <!-- SECTION: Treatment Measures -->
+    <div class="section-divider">Treatment Measure Feature Classes</div>
+
+    <!-- 1. BioretentionBasin -->
+    <div class="fc-card t-bio">
+      <div class="fc-header">
+        <div class="fc-icon">🌱</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">BioretentionBasin</div>
+          <div class="fc-title">Bioretention Basins &amp; Rain Gardens</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Engineered filter media systems — bioretention basins, planter boxes and rain gardens. Core WSUD treatment measure for TSS, TP, TN removal.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Identity &amp; Classification</div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Sqid_Id</span><span class="feature-type">String_32</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">SubType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Bioretention Basin</span><span class="enum-tag">Rain Garden</span><span class="enum-tag">Planter Box</span><span class="enum-tag">Bioretention Swale</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">FlowPath</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Online</span><span class="enum-tag">Offline</span></div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Filter Media</div>
+          <div class="feature-row"><span class="feature-name">FilterArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">FilterDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">MediaType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Sandy Loam</span><span class="enum-tag">Compost Mix</span><span class="enum-tag">Zeolite Blend</span><span class="enum-tag">Proprietary</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">HasUnderdrainPipe</span><span class="feature-type">Boolean</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">UnderdrainDia_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory opt">○ N</span></div>
+        </div>
+
+        <div class="fc-toggle" onclick="toggleDetails(this)">▸ PONDING, VEGETATION &amp; PERFORMANCE</div>
+        <div class="fc-details">
+          <div class="scrollable">
+            <div class="feature-group">
+              <div class="feature-group-label">Ponding</div>
+              <div class="feature-row"><span class="feature-name">PondingDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">PondingArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+              <div class="feature-row"><span class="feature-name">TransitionDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">DrainageDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">OverflowType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+              <div class="enum-wrap"><span class="enum-tag">Pit Overflow</span><span class="enum-tag">Bypass Channel</span><span class="enum-tag">Overflow Weir</span><span class="enum-tag">Standpipe</span></div>
+            </div>
+            <div class="feature-group">
+              <div class="feature-group-label">Vegetation</div>
+              <div class="feature-row"><span class="feature-name">PlantSpecies</span><span class="feature-type">String_64</span><span class="feature-mandatory opt">○ N</span></div>
+              <div class="feature-row"><span class="feature-name">VegetationCover_pct</span><span class="feature-type">posInt (0–100)</span><span class="feature-mandatory opt">○ N</span></div>
+              <div class="feature-row"><span class="feature-name">VegetationHealth</span><span class="feature-type">Enum</span><span class="feature-mandatory opt">○ N</span></div>
+              <div class="enum-wrap"><span class="enum-tag">Excellent</span><span class="enum-tag">Good</span><span class="enum-tag">Fair</span><span class="enum-tag">Poor</span><span class="enum-tag">Dead</span></div>
+            </div>
+            <div class="feature-group">
+              <div class="feature-group-label">WQ Design Targets</div>
+              <div class="feature-row"><span class="feature-name">TSS_Reduction_pct</span><span class="feature-type">Float (0–100)</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">TP_Reduction_pct</span><span class="feature-type">Float (0–100)</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">TN_Reduction_pct</span><span class="feature-type">Float (0–100)</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">DesignARI_yr</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">CatchmentArea_ha</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="geom-chip">◆ geometry_area_multipath_complex</div>
+      </div>
+    </div>
+
+    <!-- 2. VegetatedSwale -->
+    <div class="fc-card t-swale">
+      <div class="fc-header">
+        <div class="fc-icon">🌾</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">VegetatedSwale</div>
+          <div class="fc-title">Swales &amp; Buffer Strips</div>
+        </div>
+        <div class="fc-badge">Polyline / Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Vegetated drainage channels providing conveyance with filtration. Includes grassed swales, enhanced filter swales and buffer strips for road and car park runoff.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Classification</div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">SwaleType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Grassed Swale</span><span class="enum-tag">Enhanced Filter Swale</span><span class="enum-tag">Buffer Strip</span><span class="enum-tag">Dry Swale</span><span class="enum-tag">Wet Swale</span>
+          </div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Geometry &amp; Hydraulics</div>
+          <div class="feature-row"><span class="feature-name">Length_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">BaseWidth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">SideSlope_H_V</span><span class="feature-type">Float+ (e.g. 4:1)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">LongitudinalGrade_pct</span><span class="feature-type">Float</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">DesignFlow_m3s</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">CheckDamCount</span><span class="feature-type">posInt</span><span class="feature-mandatory opt">○ N</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_line_polyline / geometry_area_polygon</div>
+      </div>
+    </div>
+
+    <!-- 3. ConstructedWetland -->
+    <div class="fc-card t-wet">
+      <div class="fc-header">
+        <div class="fc-icon">🏞️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">ConstructedWetland</div>
+          <div class="fc-title">Constructed Wetlands</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Multi-zone treatment wetlands with macrophyte zones, open water zones and inlet/outlet structures. LCC's highest-performance WSUD treatment measure.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Zone Geometry</div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">TotalArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">MacrophyteArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">OpenWaterArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">SedimentForebayArea</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Water Levels</div>
+          <div class="feature-row"><span class="feature-name">PermanentPoolLevel_m</span><span class="feature-type">float (AHD)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">MacrophyteDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">OpenWaterDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">HydraulicRetTime_days</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+
+        <div class="fc-toggle" onclick="toggleDetails(this)">▸ INLET/OUTLET, VOLUME &amp; SPILLWAY</div>
+        <div class="fc-details">
+          <div class="scrollable">
+            <div class="feature-group">
+              <div class="feature-group-label">Inlet / Outlet</div>
+              <div class="feature-row"><span class="feature-name">InletType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+              <div class="enum-wrap"><span class="enum-tag">Pipe</span><span class="enum-tag">Spreader</span><span class="enum-tag">Rock Apron</span><span class="enum-tag">Culvert</span></div>
+              <div class="feature-row mt-4"><span class="feature-name">OutletType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+              <div class="enum-wrap"><span class="enum-tag">Riser Pipe</span><span class="enum-tag">Overflow Weir</span><span class="enum-tag">Low-flow Orifice</span></div>
+              <div class="feature-row mt-4"><span class="feature-name">HasSpillway</span><span class="feature-type">Boolean</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">SpillwayCrest_m</span><span class="feature-type">float (AHD)</span><span class="feature-mandatory opt">○ N</span></div>
+            </div>
+            <div class="feature-group">
+              <div class="feature-group-label">Volume &amp; Sediment</div>
+              <div class="feature-row"><span class="feature-name">PermanentVolume_m3</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">ExtendedDetVol_m3</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+              <div class="feature-row"><span class="feature-name">SedimentVol_m3</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">SedimentRemovalCycle</span><span class="feature-type">posInt (months)</span><span class="feature-mandatory opt">○ N</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="geom-chip">◆ geometry_area_multipath_complex</div>
+      </div>
+    </div>
+
+    <!-- 4. DetentionBasin -->
+    <div class="fc-card t-det">
+      <div class="fc-header">
+        <div class="fc-icon">🪣</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">DetentionBasin</div>
+          <div class="fc-title">Detention &amp; Retention Basins</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Stormwater storage basins for peak-flow attenuation and water quality treatment. Includes dry, wet, sedimentation and infiltration sub-types.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Classification</div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">BasinType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Dry Detention</span><span class="enum-tag">Wet Retention</span><span class="enum-tag">Sedimentation</span><span class="enum-tag">Infiltration</span><span class="enum-tag">Harvesting Pond</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">IsReferableDam</span><span class="feature-type">Boolean</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Design Parameters</div>
+          <div class="feature-row"><span class="feature-name">StorageVolume_m3</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">SurfaceArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">DesignARI_yr</span><span class="feature-type">posInt</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">OutletLevel_m</span><span class="feature-type">float (AHD)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">MinSurfaceLevel_m</span><span class="feature-type">float (AHD)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">HasSpillway</span><span class="feature-type">Boolean</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_area_multipath_complex</div>
+      </div>
+    </div>
+
+    <!-- 5. RainwaterHarvestingSystem -->
+    <div class="fc-card t-rain">
+      <div class="fc-header">
+        <div class="fc-icon">💧</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">RainwaterSystem</div>
+          <div class="fc-title">Rainwater Harvesting &amp; Reuse</div>
+        </div>
+        <div class="fc-badge">Point</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Council-owned rainwater tanks, aquifer storage and recovery systems, and stormwater reuse schemes. Tracked for volumetric and water quality credits.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">System Type</div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">SystemType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Rainwater Tank</span><span class="enum-tag">ASR System</span><span class="enum-tag">Stormwater Reuse</span><span class="enum-tag">Irrigation Scheme</span>
+          </div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Capacity &amp; Connection</div>
+          <div class="feature-row"><span class="feature-name">TankCapacity_kL</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">CatchmentArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">ReusePurpose</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Irrigation</span><span class="enum-tag">Toilet Flushing</span><span class="enum-tag">Fire Fighting</span><span class="enum-tag">Dust Suppression</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">AnnualYield_kL</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">MeterInstalled</span><span class="feature-type">Boolean</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <!-- 6. SedimentationDevice -->
+    <div class="fc-card t-sed">
+      <div class="fc-header">
+        <div class="fc-icon">⚗️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">SedimentationDevice</div>
+          <div class="fc-title">Sedimentation Basins &amp; Forebays</div>
+        </div>
+        <div class="fc-badge">Point / Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Pre-treatment sedimentation chambers and forebay ponds upstream of wetlands and bioretention systems. Critical for protecting filter media from premature clogging.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Device Details</div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">DeviceType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Sedimentation Basin</span><span class="enum-tag">Forebay Pond</span><span class="enum-tag">Sediment Trap</span><span class="enum-tag">Micro-pool</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Volume_m3</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">SurfaceArea_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">DesignSedimentLoad</span><span class="feature-type">Float (kg/yr)</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">DownstreamWSUD_ID</span><span class="feature-type">String_32 (FK)</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_point / geometry_area_polygon</div>
+      </div>
+    </div>
+
+    <!-- 7. GPT — Gross Pollutant Trap -->
+    <div class="fc-card t-gpt">
+      <div class="fc-header">
+        <div class="fc-icon">🔩</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">GrossPollutantTrap</div>
+          <div class="fc-title">Gross Pollutant Traps (GPT)</div>
+        </div>
+        <div class="fc-badge">Point</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Proprietary and non-proprietary devices for litter, gross pollutant and coarse sediment capture. Classified as complex (GPTComplex) or simple (GPTSimple/NonGPT). Aligns to LCC ADAC Stormwater standard.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Device Classification</div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Sqid_Id</span><span class="feature-type">String_32</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">DeviceClass</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">GPTComplex</span><span class="enum-tag">GPTSimple</span><span class="enum-tag">NonGPTSimple</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">DeviceBrand</span><span class="feature-type">String_64</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">DesignFlow_m3s</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">ScreenSize_mm</span><span class="feature-type">posInt</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">AccessType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Hatch Access</span><span class="enum-tag">Maintenance Hole</span><span class="enum-tag">Open Basket</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_point_singlepoint</div>
+      </div>
+    </div>
+
+    <!-- 8. PorousPaving -->
+    <div class="fc-card t-perv">
+      <div class="fc-header">
+        <div class="fc-icon">🧱</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">PorousPaving</div>
+          <div class="fc-title">Permeable / Porous Pavement</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">Permeable paving systems including porous asphalt, permeable concrete, permeable pavers and grass-cell systems. Provides infiltration and first-flush treatment.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Pavement Type</div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">PavementType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Porous Asphalt</span><span class="enum-tag">Permeable Concrete</span><span class="enum-tag">Permeable Pavers</span><span class="enum-tag">Grass-cell</span><span class="enum-tag">Gravel Fill</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">Area_m2</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">SubbaseDepth_m</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">InfiltrationRate_mm_hr</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">HasLinedBase</span><span class="feature-type">Boolean</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_area_polygon</div>
+      </div>
+    </div>
+
+    <!-- SECTION: Compliance & Management -->
+    <div class="section-divider">Stormwater Offset &amp; Compliance</div>
+
+    <!-- 9. StormwaterOffset -->
+    <div class="fc-card t-offset">
+      <div class="fc-header">
+        <div class="fc-icon">⚖️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">StormwaterOffset</div>
+          <div class="fc-title">Stormwater Quality Offsets</div>
+        </div>
+        <div class="fc-badge">Record</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">LCC-Specific: Tracks financial and physical WSUD offset obligations under the Stormwater Offset Framework. Links development applications to Council-owned offset assets.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Offset Identification</div>
+          <div class="feature-row"><span class="feature-name">Offset_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">DA_Reference</span><span class="feature-type">String_64</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">OffsetType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Financial Offset</span><span class="enum-tag">Works-in-Kind</span><span class="enum-tag">Land Dedication</span>
+          </div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Pollutant Loads</div>
+          <div class="feature-row"><span class="feature-name">TSS_Load_kg_yr</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">TP_Load_kg_yr</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">TN_Load_kg_yr</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">OffsetValue_AUD</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">LinkedWSUD_ID</span><span class="feature-type">String_32 (FK)</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">StatusDate</span><span class="feature-type">Date</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">OffsetStatus</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Pending</span><span class="enum-tag">Active</span><span class="enum-tag">Completed</span><span class="enum-tag">Lapsed</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION: Inspection & Maintenance -->
+    <div class="section-divider">Inspection, Maintenance &amp; Water Quality Performance</div>
+
+    <!-- 10. WSUDInspection -->
+    <div class="fc-card t-inspect">
+      <div class="fc-header">
+        <div class="fc-icon">🔍</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">WSUDInspection</div>
+          <div class="fc-title">Condition Inspection Records</div>
+        </div>
+        <div class="fc-badge">Record (1:Many)</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">LCC-Specific: Whole-of-life inspection records for all WSUD feature classes. One WSUD asset may have many inspection records over time. Drives renewal priority scoring.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Inspection Identity</div>
+          <div class="feature-row"><span class="feature-name">Inspection_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32 (FK)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">InspectionDate</span><span class="feature-type">Date</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">InspectorName</span><span class="feature-type">String_64</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">InspectionMethod</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Visual Field</span><span class="enum-tag">UAV / Drone</span><span class="enum-tag">Desktop Review</span><span class="enum-tag">WQ Sampling</span></div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Condition Scoring</div>
+          <div class="feature-row"><span class="feature-name">ConditionGrade</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">1 — Excellent</span><span class="enum-tag">2 — Good</span><span class="enum-tag">3 — Fair</span><span class="enum-tag">4 — Poor</span><span class="enum-tag">5 — Critical</span></div>
+          <div class="feature-row mt-4"><span class="feature-name">StructuralIntegrity</span><span class="feature-type">Enum (1–5)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">VegetationHealth</span><span class="feature-type">Enum (1–5)</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">SedimentAccumulation</span><span class="feature-type">Enum (1–5)</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">LitterLoad</span><span class="feature-type">Enum</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="enum-wrap"><span class="enum-tag">None</span><span class="enum-tag">Minor</span><span class="enum-tag">Moderate</span><span class="enum-tag">Heavy</span></div>
+        </div>
+
+        <div class="fc-toggle" onclick="toggleDetails(this)">▸ DEFECT DETAIL &amp; RENEWAL PRIORITY</div>
+        <div class="fc-details">
+          <div class="scrollable">
+            <div class="feature-group">
+              <div class="feature-group-label">Defects &amp; Issues</div>
+              <div class="feature-row"><span class="feature-name">DefectType</span><span class="feature-type">Enum (multi)</span><span class="feature-mandatory opt">○ N</span></div>
+              <div class="enum-wrap">
+                <span class="enum-tag">Erosion</span><span class="enum-tag">Clogging</span><span class="enum-tag">Vegetation Die-off</span>
+                <span class="enum-tag">Outlet Blockage</span><span class="enum-tag">Structural Failure</span>
+                <span class="enum-tag">Invasive Weeds</span><span class="enum-tag">Sedimentation</span><span class="enum-tag">Litter Accumulation</span>
+              </div>
+              <div class="feature-row mt-4"><span class="feature-name">DefectNotes</span><span class="feature-type">String (free text)</span><span class="feature-mandatory opt">○ N</span></div>
+              <div class="feature-row"><span class="feature-name">PhotoReference</span><span class="feature-type">String_256 (URL)</span><span class="feature-mandatory opt">○ N</span></div>
+            </div>
+            <div class="feature-group">
+              <div class="feature-group-label">Renewal Priority</div>
+              <div class="feature-row"><span class="feature-name">RenewalPriority</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+              <div class="enum-wrap"><span class="enum-tag">URGENT</span><span class="enum-tag">HIGH</span><span class="enum-tag">MEDIUM</span><span class="enum-tag">LOW</span><span class="enum-tag">MONITOR</span></div>
+              <div class="feature-row mt-4"><span class="feature-name">EstimatedRemediation_AUD</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+              <div class="feature-row"><span class="feature-name">NextInspectionDate</span><span class="feature-type">Date</span><span class="feature-mandatory">★ M</span></div>
+              <div class="feature-row"><span class="feature-name">ActionRequired</span><span class="feature-type">Boolean</span><span class="feature-mandatory">★ M</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 11. MaintenanceActivity -->
+    <div class="fc-card t-maint">
+      <div class="fc-header">
+        <div class="fc-icon">🔧</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">MaintenanceActivity</div>
+          <div class="fc-title">Maintenance &amp; Works Records</div>
+        </div>
+        <div class="fc-badge">Record (1:Many)</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">LCC-Specific: All maintenance works and reactive repairs against WSUD assets. Links to inspection trigger, contractor, cost and outcome. Supports budget planning and operational reporting.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Activity Identity</div>
+          <div class="feature-row"><span class="feature-name">Activity_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32 (FK)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">TriggerInspection_ID</span><span class="feature-type">String_32 (FK)</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">ActivityType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Routine Mowing</span><span class="enum-tag">Sediment Removal</span><span class="enum-tag">Vegetation Replanting</span>
+            <span class="enum-tag">Litter Collection</span><span class="enum-tag">Filter Media Replace</span>
+            <span class="enum-tag">Outlet Repair</span><span class="enum-tag">Structural Repair</span><span class="enum-tag">GPT Cleanout</span>
+          </div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Cost &amp; Outcome</div>
+          <div class="feature-row"><span class="feature-name">ActivityDate</span><span class="feature-type">Date</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">Contractor</span><span class="feature-type">String_64</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">ActualCost_AUD</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">ConditionPostWork</span><span class="feature-type">Enum (1–5)</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">WorkOrderRef</span><span class="feature-type">String_32</span><span class="feature-mandatory opt">○ N</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 12. CatchmentBoundary -->
+    <div class="fc-card t-catchm">
+      <div class="fc-header">
+        <div class="fc-icon">🗺️</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">CatchmentBoundary</div>
+          <div class="fc-title">WSUD Catchment Areas</div>
+        </div>
+        <div class="fc-badge">Polygon</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">GIS-defined drainage catchment polygons contributing to each WSUD asset. Supports stormwater quality modelling (WQM), offset calculations and future infrastructure planning.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Catchment Identity</div>
+          <div class="feature-row"><span class="feature-name">Catchment_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32 (FK)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">CatchmentArea_ha</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">ImpervArea_ha</span><span class="feature-type">Float+</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">ImperviousFraction</span><span class="feature-type">Float (0–1)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">LandUseType</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap">
+            <span class="enum-tag">Residential Low</span><span class="enum-tag">Residential Medium</span><span class="enum-tag">Commercial</span>
+            <span class="enum-tag">Industrial</span><span class="enum-tag">Open Space</span><span class="enum-tag">Road Reserve</span>
+          </div>
+          <div class="feature-row mt-4"><span class="feature-name">WQM_ModelRef</span><span class="feature-type">String_64</span><span class="feature-mandatory opt">○ N</span></div>
+        </div>
+        <div class="geom-chip">◆ geometry_area_multipath_complex</div>
+      </div>
+    </div>
+
+    <!-- 13. WQPerformanceRecord -->
+    <div class="fc-card t-wq">
+      <div class="fc-header">
+        <div class="fc-icon">📊</div>
+        <div class="fc-title-group">
+          <div class="fc-class-name">WQPerformanceRecord</div>
+          <div class="fc-title">Water Quality Performance Monitoring</div>
+        </div>
+        <div class="fc-badge">Record (1:Many)</div>
+      </div>
+      <div class="fc-body">
+        <div class="fc-desc">LCC-Specific: Measured and modelled water quality performance data for each WSUD asset. Used to verify offset compliance, report to SEQ DESI, and trigger maintenance interventions.</div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Monitoring Event</div>
+          <div class="feature-row"><span class="feature-name">WQ_ID</span><span class="feature-type">String_32</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">WSUD_ID</span><span class="feature-type">String_32 (FK)</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">SampleDate</span><span class="feature-type">Date</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">DataSource</span><span class="feature-type">Enum</span><span class="feature-mandatory">★ M</span></div>
+          <div class="enum-wrap"><span class="enum-tag">Field Sample</span><span class="enum-tag">WQM Model</span><span class="enum-tag">MUSIC Model</span><span class="enum-tag">Third-Party Lab</span></div>
+        </div>
+
+        <div class="feature-group">
+          <div class="feature-group-label">Pollutant Loads (Measured)</div>
+          <div class="feature-row"><span class="feature-name">TSS_Inlet_mg_L</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">TSS_Outlet_mg_L</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">TP_Inlet_mg_L</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">TP_Outlet_mg_L</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">TN_Inlet_mg_L</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">TN_Outlet_mg_L</span><span class="feature-type">Float+</span><span class="feature-mandatory opt">○ N</span></div>
+          <div class="feature-row"><span class="feature-name">MeetsDesignTarget</span><span class="feature-type">Boolean</span><span class="feature-mandatory">★ M</span></div>
+          <div class="feature-row"><span class="feature-name">OffsetCompliant</span><span class="feature-type">Boolean</span><span class="feature-mandatory">★ M</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end grid -->
+
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:var(--warn)"></span>★ M = Mandatory field</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--muted)"></span>○ N = Optional field</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--accent3)"></span>◆ = Geometry type</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--accent1)"></span>LCC = Council-specific attribute</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--accent2)"></span>▸ = Click to expand details</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--amber)"></span>FK = Foreign Key (links to parent asset)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>SEQ = South East Queensland WSUD compliant</div>
+  </div>
+
+  <footer>
+    <span>WSUD</span> Asset Management Schema · LCC Spatial Data Model · SEQ WSUD &amp; ADAC Stormwater Architecture
+  </footer>
+</div>
+
+<script>
+  function toggleDetails(btn) {
+    const details = btn.nextElementSibling;
+    const isOpen = details.classList.contains('open');
+    details.classList.toggle('open', !isOpen);
+    btn.textContent = isOpen
+      ? btn.textContent.replace('▾', '▸')
+      : btn.textContent.replace('▸', '▾');
+    btn.style.color = isOpen ? '' : 'var(--accent1)';
+  }
+</script>
+</body>
+</html>
